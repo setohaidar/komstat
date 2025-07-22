@@ -22,6 +22,7 @@ library(lmtest) # Ditambahkan untuk uji asumsi regresi
 library(cluster) # Untuk analisis clustering
 library(factoextra) # Untuk visualisasi clustering
 library(fpc) # Untuk validasi clustering
+library(scales) # Untuk formatting dalam plot
 
 #================================================================#
 #                           UI (USER INTERFACE)                  #
@@ -246,50 +247,81 @@ ui <- dashboardPage(
                 box(
                   title = "Langkah 1: Persiapan Variabel Proporsi", width = 12, solidHeader = TRUE, status = "info",
                   p("Uji proporsi memerlukan variabel biner (Dua kategori, misal: 'Tinggi'/'Rendah'). Buat variabel tersebut di sini."),
-                  column(width = 4,
-                         uiOutput("prop_var_selector"),
-                         selectInput("prop_threshold_method", "Metode Penentuan Batas:",
-                                     choices = c("Median", "Rata-rata (Mean)", "Nilai Kustom")),
-                         uiOutput("prop_custom_threshold_ui")
+                  fluidRow(
+                    column(width = 3,
+                           uiOutput("prop_var_selector"),
+                           helpText("Pilih variabel numerik yang akan dikonversi menjadi kategori biner.")
+                    ),
+                    column(width = 3,
+                           selectInput("prop_threshold_method", "Metode Penentuan Batas:",
+                                       choices = c("Median", "Rata-rata (Mean)", "Nilai Kustom")),
+                           uiOutput("prop_custom_threshold_ui"),
+                           helpText("Nilai di atas batas akan dikategorikan sebagai 'Sukses'.")
+                    ),
+                    column(width = 3,
+                           textInput("prop_label_sukses", "Label untuk Kategori 'Sukses':", "Tinggi"),
+                           textInput("prop_label_gagal", "Label untuk Kategori 'Gagal':", "Rendah"),
+                           actionButton("prop_generate_button", "Buat Variabel Biner", 
+                                      icon = icon("cogs"), class = "btn-primary btn-block")
+                    ),
+                    column(width = 3,
+                           h4("Status Variabel Biner"),
+                           verbatimTextOutput("prop_status_output"),
+                           br(),
+                           conditionalPanel(
+                             condition = "output.prop_variable_created == true",
+                             div(class = "alert alert-success", 
+                                 icon("check-circle"), " Variabel biner berhasil dibuat!")
+                           )
+                    )
                   ),
-                  column(width = 4,
-                         textInput("prop_label_sukses", "Label untuk Kategori 'Sukses' (di atas batas):", "Tinggi"),
-                         textInput("prop_label_gagal", "Label untuk Kategori 'Gagal' (di bawah batas):", "Rendah"),
-                         actionButton("prop_generate_button", "Buat Variabel Biner", icon = icon("cogs"))
-                  ),
-                  column(width = 4,
-                         h4("Status"),
-                         verbatimTextOutput("prop_status_output")
-                  )
+                  hr(),
+                  h4("Preview Data Biner"),
+                  DTOutput("prop_preview_table")
                 )
               ),
               fluidRow(
                 box(
                   title = "Uji Proporsi Satu Sampel", width = 6, solidHeader = TRUE, status = "primary", collapsible = TRUE,
-                  p("Menguji apakah proporsi kategori 'sukses' pada data sama dengan nilai hipotesis."),
+                  p("Menguji apakah proporsi kategori 'sukses' pada data sama dengan nilai hipotesis tertentu."),
                   hr(),
-                  numericInput("prop1_p_hipotesis", "Nilai Proporsi Hipotesis (antara 0 dan 1):", 0.5, min = 0, max = 1, step = 0.01),
-                  h4("Hasil Uji"),
+                  numericInput("prop1_p_hipotesis", "Nilai Proporsi Hipotesis (0-1):", 
+                             value = 0.5, min = 0, max = 1, step = 0.01),
+                  helpText("Contoh: 0.5 berarti 50% dari populasi diharapkan masuk kategori 'Sukses'."),
+                  br(),
+                  h4("Hasil Uji Proporsi Satu Sampel"),
                   uiOutput("prop1_test_result_table"),
                   hr(),
-                  h5("Interpretasi:", style = "font-weight:bold;"),
-                  textOutput("prop1_test_interpretation")
+                  h4("Interpretasi", style = "color: #3c8dbc;"),
+                  div(class = "well", textOutput("prop1_test_interpretation"))
                 ),
                 box(
                   title = "Uji Proporsi Dua Sampel", width = 6, solidHeader = TRUE, status = "primary", collapsible = TRUE,
                   p("Membandingkan proporsi kategori 'sukses' antara dua kelompok. Kelompok dibuat di tab 'Manajemen Data'."),
                   hr(),
                   uiOutput("prop2_group_selectors_ui"),
-                  h4("Hasil Uji"),
+                  br(),
+                  h4("Hasil Uji Proporsi Dua Sampel"),
                   uiOutput("prop2_test_result_table"),
                   hr(),
-                  h5("Interpretasi:", style = "font-weight:bold;"),
-                  textOutput("prop2_test_interpretation")
+                  h4("Interpretasi", style = "color: #3c8dbc;"),
+                  div(class = "well", textOutput("prop2_test_interpretation"))
                 )
               ),
               fluidRow(
-                box(title = "Unduh Hasil", width = 12,
-                    downloadButton("download_uji_proporsi", "Unduh Hasil Uji Proporsi (Word)")
+                box(
+                  title = "Visualisasi Proporsi", width = 6, solidHeader = TRUE, status = "success",
+                  plotOutput("prop_visualization", height = "350px")
+                ),
+                box(
+                  title = "Ringkasan Statistik", width = 6, solidHeader = TRUE, status = "info",
+                  DTOutput("prop_summary_table")
+                )
+              ),
+              fluidRow(
+                box(title = "Unduh Hasil", width = 12, solidHeader = TRUE, status = "warning",
+                    downloadButton("download_uji_proporsi", "Unduh Hasil Uji Proporsi (Word)", 
+                                 class = "btn-warning btn-lg")
                 )
               )
       ),
@@ -869,22 +901,34 @@ server <- function(input, output, session) {
   
   #--- LOGIKA UNTUK UJI PROPORSI ---#
   prop_data <- reactiveVal(NULL)
+  prop_threshold_value <- reactiveVal(NULL)
   
   output$prop_var_selector <- renderUI({
     df <- data_sosial()
     kolom_numerik <- names(df)[sapply(df, is.numeric)]
     kolom_numerik <- setdiff(kolom_numerik, nama_kolom_kode)
-    selectInput("prop_var_biner", "Pilih Variabel Numerik untuk Dibuat Biner:", choices = kolom_numerik)
+    selectInput("prop_var_biner", "Pilih Variabel Numerik:", 
+                choices = kolom_numerik,
+                selected = if(length(kolom_numerik) > 0) kolom_numerik[1] else NULL)
   })
   
   output$prop_custom_threshold_ui <- renderUI({
-    if (input$prop_threshold_method == "Nilai Kustom") {
-      numericInput("prop_custom_threshold", "Masukkan Nilai Batas Kustom:", value = 0)
+    if (!is.null(input$prop_threshold_method) && input$prop_threshold_method == "Nilai Kustom") {
+      df <- data_sosial()
+      if (!is.null(input$prop_var_biner) && input$prop_var_biner %in% names(df)) {
+        var_range <- range(df[[input$prop_var_biner]], na.rm = TRUE)
+        numericInput("prop_custom_threshold", "Masukkan Nilai Batas Kustom:", 
+                   value = mean(var_range), 
+                   min = var_range[1], 
+                   max = var_range[2],
+                   step = (var_range[2] - var_range[1]) / 100)
+      }
     }
   })
   
-  observeEvent(input$prop_generate_button, {
-    req(input$prop_var_biner, input$prop_threshold_method, input$prop_label_sukses, input$prop_label_gagal)
+  # Reactive untuk menampilkan informasi threshold
+  threshold_info <- reactive({
+    req(input$prop_var_biner, input$prop_threshold_method)
     
     df <- data_sosial()
     var_to_bin <- df[[input$prop_var_biner]]
@@ -893,23 +937,103 @@ server <- function(input, output, session) {
                         "Median" = median(var_to_bin, na.rm = TRUE),
                         "Rata-rata (Mean)" = mean(var_to_bin, na.rm = TRUE),
                         "Nilai Kustom" = {
-                          req(input$prop_custom_threshold)
-                          input$prop_custom_threshold
+                          if (!is.null(input$prop_custom_threshold)) {
+                            input$prop_custom_threshold
+                          } else {
+                            median(var_to_bin, na.rm = TRUE)
+                          }
                         })
+    
+    list(
+      threshold = threshold,
+      min_val = min(var_to_bin, na.rm = TRUE),
+      max_val = max(var_to_bin, na.rm = TRUE),
+      mean_val = mean(var_to_bin, na.rm = TRUE),
+      median_val = median(var_to_bin, na.rm = TRUE)
+    )
+  })
+  
+  observeEvent(input$prop_generate_button, {
+    req(input$prop_var_biner, input$prop_threshold_method, input$prop_label_sukses, input$prop_label_gagal)
+    
+    # Validasi input
+    validate(
+      need(input$prop_label_sukses != "", "Label 'Sukses' tidak boleh kosong."),
+      need(input$prop_label_gagal != "", "Label 'Gagal' tidak boleh kosong."),
+      need(input$prop_label_sukses != input$prop_label_gagal, "Label 'Sukses' dan 'Gagal' harus berbeda.")
+    )
+    
+    df <- data_sosial()
+    var_to_bin <- df[[input$prop_var_biner]]
+    
+    # Validasi data numerik
+    validate(
+      need(!all(is.na(var_to_bin)), "Variabel yang dipilih tidak memiliki data valid."),
+      need(is.numeric(var_to_bin), "Variabel yang dipilih harus berupa angka.")
+    )
+    
+    threshold_val <- threshold_info()$threshold
+    prop_threshold_value(threshold_val)
     
     sukses_label <- input$prop_label_sukses
     gagal_label <- input$prop_label_gagal
     
-    df$prop_variable_biner <- factor(ifelse(var_to_bin > threshold, sukses_label, gagal_label), levels = c(sukses_label, gagal_label))
+    # Buat variabel biner
+    df$prop_variable_biner <- factor(
+      ifelse(var_to_bin > threshold_val, sukses_label, gagal_label), 
+      levels = c(sukses_label, gagal_label)
+    )
+    
+    # Simpan informasi tambahan
+    df$prop_original_value <- var_to_bin
+    df$prop_threshold_used <- threshold_val
     
     prop_data(df)
     
+    # Update status output
+    sukses_count <- sum(df$prop_variable_biner == sukses_label, na.rm = TRUE)
+    gagal_count <- sum(df$prop_variable_biner == gagal_label, na.rm = TRUE)
+    total_count <- sukses_count + gagal_count
+    
     output$prop_status_output <- renderText({
-      paste("Variabel biner 'prop_variable_biner' berhasil dibuat.\n",
-            "Batas (threshold):", round(threshold, 2), "\n",
-            "Jumlah '", sukses_label, "': ", sum(df$prop_variable_biner == sukses_label), "\n",
-            "Jumlah '", gagal_label, "': ", sum(df$prop_variable_biner == gagal_label))
+      paste("✓ Variabel biner berhasil dibuat!\n",
+            "Variabel:", input$prop_var_biner, "\n",
+            "Metode batas:", input$prop_threshold_method, "\n",
+            "Nilai batas:", round(threshold_val, 3), "\n",
+            "Total observasi:", total_count, "\n",
+            "Jumlah '", sukses_label, "':", sukses_count, "(", round(sukses_count/total_count*100, 1), "%)\n",
+            "Jumlah '", gagal_label, "':", gagal_count, "(", round(gagal_count/total_count*100, 1), "%)")
     })
+  })
+  
+  # Output untuk conditional panel
+  output$prop_variable_created <- reactive({
+    !is.null(prop_data())
+  })
+  outputOptions(output, "prop_variable_created", suspendWhenHidden = FALSE)
+  
+  # Preview tabel data biner
+  output$prop_preview_table <- renderDT({
+    req(prop_data())
+    
+    preview_data <- prop_data() %>%
+      select(all_of(c(nama_kolom_kabupaten, input$prop_var_biner, "prop_variable_biner"))) %>%
+      rename(
+        "Nama Wilayah" = !!sym(nama_kolom_kabupaten),
+        "Nilai Asli" = !!sym(input$prop_var_biner),
+        "Kategori Biner" = "prop_variable_biner"
+      ) %>%
+      arrange(`Kategori Biner`, desc(`Nilai Asli`))
+    
+    datatable(preview_data, 
+              options = list(pageLength = 8, scrollX = TRUE), 
+              rownames = FALSE) %>%
+      formatRound("Nilai Asli", 2) %>%
+      formatStyle("Kategori Biner",
+                  backgroundColor = styleEqual(
+                    c(input$prop_label_sukses, input$prop_label_gagal),
+                    c("#d4edda", "#f8d7da")
+                  ))
   })
   
   prop1_test_output <- reactive({
@@ -935,12 +1059,25 @@ server <- function(input, output, session) {
   
   output$prop1_test_interpretation <- renderText({
     validate(need(!is.null(prop_data()), ""))
-    p_value <- prop1_test_output()$p.value
-    if (p_value > 0.05) {
-      paste0("Kesimpulan: Proporsi sampel tidak berbeda signifikan dari proporsi hipotesis (", input$prop1_p_hipotesis, ").")
+    test_result <- prop1_test_output()
+    p_value <- test_result$p.value
+    sample_prop <- round(test_result$estimate, 3)
+    hypothesis_prop <- input$prop1_p_hipotesis
+    
+    interpretation <- if (p_value > 0.05) {
+      paste0("Kesimpulan: Proporsi sampel tidak berbeda signifikan dari proporsi hipotesis.\n",
+             "Proporsi sampel: ", sample_prop, " (", round(sample_prop*100, 1), "%)\n",
+             "Proporsi hipotesis: ", hypothesis_prop, " (", round(hypothesis_prop*100, 1), "%)\n",
+             "P-value: ", round(p_value, 4), " > 0.05\n",
+             "Interval kepercayaan 95%: [", round(test_result$conf.int[1], 3), ", ", round(test_result$conf.int[2], 3), "]")
     } else {
-      paste0("Kesimpulan: Proporsi sampel berbeda signifikan dari proporsi hipotesis (", input$prop1_p_hipotesis, ").")
+      paste0("Kesimpulan: Proporsi sampel berbeda signifikan dari proporsi hipotesis.\n",
+             "Proporsi sampel: ", sample_prop, " (", round(sample_prop*100, 1), "%)\n",
+             "Proporsi hipotesis: ", hypothesis_prop, " (", round(hypothesis_prop*100, 1), "%)\n",
+             "P-value: ", round(p_value, 4), " < 0.05\n",
+             "Interval kepercayaan 95%: [", round(test_result$conf.int[1], 3), ", ", round(test_result$conf.int[2], 3), "]")
     }
+    interpretation
   })
   
   output$prop2_group_selectors_ui <- renderUI({
@@ -991,12 +1128,118 @@ server <- function(input, output, session) {
   
   output$prop2_test_interpretation <- renderText({
     validate(need(!is.null(prop_data()), ""))
-    p_value <- prop2_test_output()$p.value
-    if (p_value > 0.05) {
-      "Kesimpulan: Tidak ada perbedaan proporsi yang signifikan antara kedua kelompok."
+    test_result <- prop2_test_output()
+    p_value <- test_result$p.value
+    prop1 <- round(test_result$estimate[1], 3)
+    prop2 <- round(test_result$estimate[2], 3)
+    
+    interpretation <- if (p_value > 0.05) {
+      paste0("Kesimpulan: Tidak ada perbedaan proporsi yang signifikan antara kedua kelompok.\n",
+             "Proporsi ", input$prop2_group1, ": ", prop1, " (", round(prop1*100, 1), "%)\n",
+             "Proporsi ", input$prop2_group2, ": ", prop2, " (", round(prop2*100, 1), "%)\n",
+             "P-value: ", round(p_value, 4), " > 0.05")
     } else {
-      "Kesimpulan: Terdapat perbedaan proporsi yang signifikan antara kedua kelompok."
+      paste0("Kesimpulan: Terdapat perbedaan proporsi yang signifikan antara kedua kelompok.\n",
+             "Proporsi ", input$prop2_group1, ": ", prop1, " (", round(prop1*100, 1), "%)\n",
+             "Proporsi ", input$prop2_group2, ": ", prop2, " (", round(prop2*100, 1), "%)\n",
+             "P-value: ", round(p_value, 4), " < 0.05")
     }
+    interpretation
+  })
+  
+  # Visualisasi proporsi
+  output$prop_visualization <- renderPlot({
+    req(prop_data())
+    
+    df <- prop_data()
+    
+         # Jika ada kategori dari manajemen data, buat plot perbandingan
+     if (!is.null(kategori_info()) && nrow(kategori_info()$data) > 0) {
+       df_kat <- kategori_info()$data
+       df_merged <- df %>%
+         select(all_of(c(nama_kolom_kode, "prop_variable_biner"))) %>%
+         left_join(df_kat %>% select(all_of(c(nama_kolom_kode, "Kategori"))), by = nama_kolom_kode)
+         
+       if ("Kategori" %in% names(df_merged) && !all(is.na(df_merged$Kategori))) {
+        # Plot perbandingan antar kelompok
+        p1 <- ggplot(df_merged, aes(x = Kategori, fill = prop_variable_biner)) +
+          geom_bar(position = "fill", alpha = 0.8) +
+          scale_y_continuous(labels = scales::percent_format()) +
+          labs(title = "Proporsi Kategori Biner per Kelompok",
+               x = "Kelompok", y = "Proporsi (%)",
+               fill = "Kategori Biner") +
+          theme_minimal() +
+          theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+          scale_fill_manual(values = c("#28a745", "#dc3545"))
+        
+        return(p1)
+      }
+    }
+    
+    # Plot sederhana jika tidak ada kategori
+    prop_counts <- table(df$prop_variable_biner)
+    prop_df <- data.frame(
+      Kategori = names(prop_counts),
+      Jumlah = as.numeric(prop_counts),
+      Proporsi = as.numeric(prop_counts) / sum(prop_counts)
+    )
+    
+    ggplot(prop_df, aes(x = Kategori, y = Proporsi, fill = Kategori)) +
+      geom_col(alpha = 0.8, width = 0.6) +
+      geom_text(aes(label = paste0(round(Proporsi*100, 1), "%\n(n=", Jumlah, ")")), 
+                vjust = -0.5, size = 4) +
+      scale_y_continuous(labels = scales::percent_format(), limits = c(0, max(prop_df$Proporsi) * 1.1)) +
+      labs(title = "Distribusi Kategori Biner",
+           x = "Kategori", y = "Proporsi (%)") +
+      theme_minimal() +
+      theme(legend.position = "none") +
+      scale_fill_manual(values = c("#28a745", "#dc3545"))
+  })
+  
+  # Ringkasan statistik
+  output$prop_summary_table <- renderDT({
+    req(prop_data())
+    
+    df <- prop_data()
+    
+    # Statistik dasar
+    basic_stats <- data.frame(
+      Metrik = c("Total Observasi", "Variabel Asli", "Metode Batas", "Nilai Batas"),
+      Nilai = c(
+        nrow(df),
+        input$prop_var_biner,
+        input$prop_threshold_method,
+        round(prop_threshold_value(), 3)
+      )
+    )
+    
+    # Statistik per kategori
+    sukses_count <- sum(df$prop_variable_biner == input$prop_label_sukses, na.rm = TRUE)
+    gagal_count <- sum(df$prop_variable_biner == input$prop_label_gagal, na.rm = TRUE)
+    total_count <- sukses_count + gagal_count
+    
+    category_stats <- data.frame(
+      Metrik = c(
+        paste("Jumlah", input$prop_label_sukses),
+        paste("Proporsi", input$prop_label_sukses),
+        paste("Jumlah", input$prop_label_gagal),
+        paste("Proporsi", input$prop_label_gagal)
+      ),
+      Nilai = c(
+        sukses_count,
+        paste0(round(sukses_count/total_count*100, 1), "%"),
+        gagal_count,
+        paste0(round(gagal_count/total_count*100, 1), "%")
+      )
+    )
+    
+    # Gabungkan statistik
+    summary_stats <- rbind(basic_stats, category_stats)
+    
+    datatable(summary_stats, 
+              options = list(dom = 't', pageLength = 15), 
+              rownames = FALSE) %>%
+      formatStyle('Metrik', fontWeight = 'bold')
   })
   
   output$download_uji_proporsi <- downloadHandler(
@@ -1004,30 +1247,84 @@ server <- function(input, output, session) {
     content = function(file) {
       doc <- read_docx() %>% body_add_par("Hasil Uji Proporsi", style = "heading 1")
       
+      # Informasi umum tentang variabel biner
+      if (!is.null(prop_data())) {
+        doc %>% body_add_par("Informasi Variabel Biner", style = "heading 2")
+        doc %>% body_add_par(paste("Variabel Asli:", input$prop_var_biner))
+        doc %>% body_add_par(paste("Metode Penentuan Batas:", input$prop_threshold_method))
+        doc %>% body_add_par(paste("Nilai Batas (Threshold):", round(prop_threshold_value(), 3)))
+        doc %>% body_add_par(paste("Label Sukses:", input$prop_label_sukses))
+        doc %>% body_add_par(paste("Label Gagal:", input$prop_label_gagal))
+        
+        # Ringkasan distribusi
+        df <- prop_data()
+        sukses_count <- sum(df$prop_variable_biner == input$prop_label_sukses, na.rm = TRUE)
+        gagal_count <- sum(df$prop_variable_biner == input$prop_label_gagal, na.rm = TRUE)
+        total_count <- sukses_count + gagal_count
+        
+        summary_table <- data.frame(
+          Kategori = c(input$prop_label_sukses, input$prop_label_gagal, "Total"),
+          Jumlah = c(sukses_count, gagal_count, total_count),
+          Proporsi = c(
+            round(sukses_count/total_count, 4),
+            round(gagal_count/total_count, 4),
+            1.0000
+          )
+        )
+        
+        doc %>% body_add_par("Distribusi Kategori Biner", style = "heading 3")
+        doc %>% body_add_flextable(flextable(summary_table) %>% autofit() %>% theme_box())
+      }
+      
+      # Uji proporsi satu sampel
       prop1_safe <- tryCatch(prop1_test_output(), error = function(e) e)
       if (!inherits(prop1_safe, "error")) {
         doc %>% body_add_par("Uji Proporsi Satu Sampel", style = "heading 2")
+        doc %>% body_add_par(paste("Hipotesis: Proporsi populasi =", input$prop1_p_hipotesis))
+        
         test_result1 <- prop1_safe
         df_res1 <- data.frame(
-          Statistik = c("Statistik Chi-Square", "Derajat Bebas (df)", "P-value", "Proporsi Sampel"),
-          Nilai = c(test_result1$statistic, test_result1$parameter, test_result1$p.value, test_result1$estimate)
+          Statistik = c("Statistik Chi-Square", "Derajat Bebas (df)", "P-value", "Proporsi Sampel", "Interval Kepercayaan 95% (Bawah)", "Interval Kepercayaan 95% (Atas)"),
+          Nilai = c(
+            round(test_result1$statistic, 4), 
+            test_result1$parameter, 
+            round(test_result1$p.value, 4), 
+            round(test_result1$estimate, 4),
+            round(test_result1$conf.int[1], 4),
+            round(test_result1$conf.int[2], 4)
+          )
         )
-        ft1 <- flextable(df_res1) %>% colformat_double(j = "Nilai", big.mark = "", digits = 4) %>% autofit() %>% theme_box()
+        ft1 <- flextable(df_res1) %>% autofit() %>% theme_box()
         doc %>% body_add_flextable(ft1)
-        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$prop1_test_interpretation())
+        doc %>% body_add_par("Interpretasi:", style = "heading 3") 
+        doc %>% body_add_par(output$prop1_test_interpretation())
       }
       
+      # Uji proporsi dua sampel
       prop2_safe <- tryCatch(prop2_test_output(), error = function(e) e)
-      if (!inherits(prop2_safe, "error")) {
+      if (!inherits(prop2_safe, "error") && !is.null(input$prop2_group1) && !is.null(input$prop2_group2)) {
         doc %>% body_add_par("Uji Proporsi Dua Sampel", style = "heading 2")
+        doc %>% body_add_par(paste("Perbandingan antara kelompok:", input$prop2_group1, "vs", input$prop2_group2))
+        
         test_result2 <- prop2_safe
         df_res2 <- data.frame(
-          Statistik = c("Statistik Chi-Square", "Derajat Bebas (df)", "P-value", "Proporsi Kelompok 1", "Proporsi Kelompok 2"),
-          Nilai = c(test_result2$statistic, test_result2$parameter, test_result2$p.value, test_result2$estimate[1], test_result2$estimate[2])
+          Statistik = c("Statistik Chi-Square", "Derajat Bebas (df)", "P-value", 
+                       paste("Proporsi", input$prop2_group1), 
+                       paste("Proporsi", input$prop2_group2),
+                       "Selisih Proporsi"),
+          Nilai = c(
+            round(test_result2$statistic, 4), 
+            test_result2$parameter, 
+            round(test_result2$p.value, 4), 
+            round(test_result2$estimate[1], 4), 
+            round(test_result2$estimate[2], 4),
+            round(test_result2$estimate[1] - test_result2$estimate[2], 4)
+          )
         )
-        ft2 <- flextable(df_res2) %>% colformat_double(j = "Nilai", big.mark = "", digits = 4) %>% autofit() %>% theme_box()
+        ft2 <- flextable(df_res2) %>% autofit() %>% theme_box()
         doc %>% body_add_flextable(ft2)
-        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$prop2_test_interpretation())
+        doc %>% body_add_par("Interpretasi:", style = "heading 3") 
+        doc %>% body_add_par(output$prop2_test_interpretation())
       }
       
       print(doc, target = file)
