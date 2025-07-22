@@ -387,12 +387,7 @@ ui <- dashboardPage(
                   plotOutput("elbow_plot", height = "400px")
                 )
               ),
-              fluidRow(
-                box(
-                  title = "Peta Clustering (Interaktif)", width = 12, solidHeader = TRUE, status = "success",
-                  leafletOutput("cluster_map", height = "500px")
-                )
-              )
+
       ),
       
       tabItem(tabName = "regresi",
@@ -1424,62 +1419,6 @@ server <- function(input, output, session) {
            y = "Within Sum of Squares") +
       theme_minimal() +
       scale_x_continuous(breaks = 2:8)
-  })
-  
-  # Peta clustering
-  output$cluster_map <- renderLeaflet({
-    results <- clustering_results()
-    req(results, geojson_data())
-    
-    # Gabungkan data clustering dengan geojson
-    map_data <- geojson_data()
-    cluster_data <- results$data %>%
-      select(all_of(c(nama_kolom_kode, nama_kolom_kabupaten)), Cluster)
-    
-    # Merge dengan geojson berdasarkan kode kabupaten
-    map_data <- map_data %>%
-      left_join(cluster_data, by = setNames(nama_kolom_kode, nama_kolom_kode))
-    
-    # Filter hanya data yang memiliki cluster
-    map_data_filtered <- map_data %>%
-      filter(!is.na(Cluster))
-    
-    # Buat palet warna untuk cluster
-    cluster_colors <- rainbow(input$num_clusters)
-    pal <- colorFactor(cluster_colors, domain = map_data_filtered$Cluster)
-    
-    # Buat popup content
-    popup_content <- paste0(
-      "<strong>", map_data_filtered[[nama_kolom_kabupaten]], "</strong><br/>",
-      "Kode: ", map_data_filtered[[nama_kolom_kode]], "<br/>",
-      "Cluster: ", map_data_filtered$Cluster
-    )
-    
-    leaflet() %>%
-      addTiles() %>%
-      setView(lng = 118, lat = -2, zoom = 5) %>%
-      addPolygons(
-        data = map_data_filtered,
-        fillColor = ~pal(Cluster),
-        weight = 2,
-        opacity = 1,
-        color = "white",
-        fillOpacity = 0.7,
-        popup = popup_content,
-        highlightOptions = highlightOptions(
-          weight = 3,
-          color = "#666",
-          fillOpacity = 0.9,
-          bringToFront = TRUE
-        )
-      ) %>%
-      addLegend(
-        pal = pal,
-        values = map_data_filtered$Cluster,
-        opacity = 0.8,
-        title = "Cluster",
-        position = "bottomright"
-      )
   })
   
   # Download handler untuk clustering
