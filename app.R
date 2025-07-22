@@ -358,6 +358,14 @@ ui <- dashboardPage(
                              h4("Statistik Cluster"),
                              verbatimTextOutput("cluster_stats")
                     ),
+                    tabPanel("Daftar Wilayah per Cluster",
+                             h4("Daftar Nama Wilayah Berdasarkan Cluster"),
+                             helpText("Tabel ini menunjukkan nama wilayah (kabupaten/kota) dan cluster yang mereka masuki."),
+                             DTOutput("region_cluster_table"),
+                             hr(),
+                             h4("Ringkasan Jumlah Wilayah per Cluster"),
+                             DTOutput("cluster_count_table")
+                    ),
                     tabPanel("Validasi Cluster",
                              h4("Metrik Validasi Clustering"),
                              DTOutput("cluster_validation_table"),
@@ -1239,6 +1247,67 @@ server <- function(input, output, session) {
     print(round(results$kmeans_result$centers, 3))
   })
   
+  # Tabel daftar wilayah per cluster
+  output$region_cluster_table <- renderDT({
+    results <- clustering_results()
+    req(results)
+    
+    # Buat tabel dengan nama wilayah dan cluster
+    region_table <- results$data %>%
+      select(all_of(c(nama_kolom_kode, nama_kolom_kabupaten, "Cluster"))) %>%
+      arrange(Cluster, !!sym(nama_kolom_kabupaten)) %>%
+      rename(
+        "Kode" = !!sym(nama_kolom_kode),
+        "Nama Wilayah" = !!sym(nama_kolom_kabupaten),
+        "Cluster" = "Cluster"
+      )
+    
+    datatable(region_table, 
+              options = list(
+                pageLength = 15, 
+                scrollX = TRUE,
+                columnDefs = list(
+                  list(className = 'dt-center', targets = c(0, 2))
+                )
+              ), 
+              rownames = FALSE,
+              filter = 'top') %>%
+      formatStyle('Cluster',
+                  backgroundColor = styleEqual(
+                    unique(region_table$Cluster),
+                    rainbow(length(unique(region_table$Cluster)), alpha = 0.3)
+                  ))
+  })
+  
+  # Tabel ringkasan jumlah wilayah per cluster
+  output$cluster_count_table <- renderDT({
+    results <- clustering_results()
+    req(results)
+    
+    count_table <- results$data %>%
+      group_by(Cluster) %>%
+      summarise(
+        Jumlah_Wilayah = n(),
+        Contoh_Wilayah = paste(head(!!sym(nama_kolom_kabupaten), 3), collapse = ", "),
+        .groups = "drop"
+      ) %>%
+      arrange(Cluster)
+    
+    datatable(count_table, 
+              options = list(
+                dom = 't',
+                columnDefs = list(
+                  list(className = 'dt-center', targets = c(0, 1))
+                )
+              ), 
+              rownames = FALSE) %>%
+      formatStyle('Cluster',
+                  backgroundColor = styleEqual(
+                    count_table$Cluster,
+                    rainbow(nrow(count_table), alpha = 0.3)
+                  ))
+  })
+  
   # Tabel validasi cluster
   output$cluster_validation_table <- renderDT({
     results <- clustering_results()
@@ -1449,6 +1518,35 @@ server <- function(input, output, session) {
       centers_df <- as.data.frame(results$kmeans_result$centers)
       centers_df <- tibble::rownames_to_column(centers_df, "Cluster")
       doc %>% body_add_flextable(flextable(centers_df) %>% autofit())
+      
+      # Daftar wilayah per cluster
+      doc %>% body_add_par("Daftar Wilayah per Cluster", style = "heading 2")
+      region_table <- results$data %>%
+        select(all_of(c(nama_kolom_kode, nama_kolom_kabupaten, "Cluster"))) %>%
+        arrange(Cluster, !!sym(nama_kolom_kabupaten)) %>%
+        rename(
+          "Kode" = !!sym(nama_kolom_kode),
+          "Nama Wilayah" = !!sym(nama_kolom_kabupaten),
+          "Cluster" = "Cluster"
+        )
+      doc %>% body_add_flextable(flextable(region_table) %>% 
+                                   autofit() %>%
+                                   theme_box() %>%
+                                   color(~ Cluster == 1, ~ Cluster, color = "red") %>%
+                                   color(~ Cluster == 2, ~ Cluster, color = "blue") %>%
+                                   color(~ Cluster == 3, ~ Cluster, color = "green"))
+      
+      # Ringkasan jumlah wilayah per cluster
+      doc %>% body_add_par("Ringkasan Jumlah Wilayah per Cluster", style = "heading 2")
+      count_table <- results$data %>%
+        group_by(Cluster) %>%
+        summarise(
+          Jumlah_Wilayah = n(),
+          Contoh_Wilayah = paste(head(!!sym(nama_kolom_kabupaten), 3), collapse = ", "),
+          .groups = "drop"
+        ) %>%
+        arrange(Cluster)
+      doc %>% body_add_flextable(flextable(count_table) %>% autofit() %>% theme_box())
       
       # Interpretasi
       doc %>% body_add_par("Interpretasi", style = "heading 2")
