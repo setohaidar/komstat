@@ -675,14 +675,40 @@ server <- function(input, output, session) {
       doc %>% body_add_par(if(input$norm_test_method == "shapiro") "Uji Normalitas (Shapiro-Wilk)" else "Uji Normalitas (Kolmogorov-Smirnov)", style = "heading 2")
       doc %>% body_add_par(paste("Variabel:", input$norm_var))
       doc %>% body_add_par(paste(capture.output(norm_test_output()), collapse="\n"))
-      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$norm_test_interpretation())
+      
+      # Interpretasi normalitas
+      test_result <- norm_test_output()
+      if (!is.null(test_result$error)) {
+        norm_interpretation <- test_result$error
+      } else {
+        p_value <- test_result$p.value
+        if (p_value > 0.05) {
+          norm_interpretation <- paste0("Kesimpulan: P-value (", round(p_value, 4), ") > 0.05, maka data berdistribusi normal.")
+        } else {
+          norm_interpretation <- paste0("Kesimpulan: P-value (", round(p_value, 4), ") <= 0.05, maka data tidak berdistribusi normal.")
+        }
+      }
+      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(norm_interpretation)
+      
       doc %>% body_add_par("Uji Homogenitas Varian (Levene's Test)", style = "heading 2")
       doc %>% body_add_par(paste("Variabel:", input$homog_var, "| Grup:", input$variabel))
       homog_output <- tryCatch(homog_test_output(), error = function(e) e)
       if (!inherits(homog_output, "error")) {
         df_homog <- as.data.frame(homog_output) %>% tibble::rownames_to_column("Sumber")
         doc %>% body_add_flextable(flextable(df_homog) %>% autofit())
-        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$homog_test_interpretation())
+        
+        # Interpretasi homogenitas
+        p_value_homog <- homog_output$`Pr(>F)`[1]
+        if (is.na(p_value_homog)) {
+          homog_interpretation <- "Tidak dapat mengambil P-value."
+        } else {
+          if (p_value_homog > 0.05) {
+            homog_interpretation <- paste0("Kesimpulan: P-value (", round(p_value_homog, 4), ") > 0.05, maka varian antar kelompok homogen.")
+          } else {
+            homog_interpretation <- paste0("Kesimpulan: P-value (", round(p_value_homog, 4), ") <= 0.05, maka varian antar kelompok tidak homogen.")
+          }
+        }
+        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(homog_interpretation)
       } else {
         doc %>% body_add_par(paste("Error:", as.character(homog_output)))
       }
@@ -738,13 +764,30 @@ server <- function(input, output, session) {
       doc %>% body_add_par("Uji-t Satu Sampel", style = "heading 2")
       doc %>% body_add_par(paste("Variabel:", input$ttest1_var, "| Nilai Hipotesis:", input$ttest1_mu))
       doc %>% body_add_par(paste(capture.output(ttest1_output()), collapse="\n"))
-      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$ttest1_interpretation())
+      
+      # Interpretasi t-test 1 sampel
+      p_value1 <- ttest1_output()$p.value
+      ttest1_interp <- if (p_value1 > 0.05) {
+        paste0("Kesimpulan: P-value (", round(p_value1, 4), ") > 0.05. Rata-rata sampel tidak berbeda signifikan dari nilai hipotesis (", input$ttest1_mu, ").")
+      } else {
+        paste0("Kesimpulan: P-value (", round(p_value1, 4), ") <= 0.05. Rata-rata sampel berbeda signifikan dari nilai hipotesis (", input$ttest1_mu, ").")
+      }
+      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(ttest1_interp)
+      
       doc %>% body_add_par("Uji-t Dua Sampel Independen", style = "heading 2")
       doc %>% body_add_par(paste("Variabel:", input$ttest2_var, "| Grup:", input$variabel))
       ttest2_safe <- tryCatch(ttest2_output(), error=function(e)e)
       if(!inherits(ttest2_safe, "error")){
         doc %>% body_add_par(paste(capture.output(ttest2_safe), collapse="\n"))
-        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$ttest2_interpretation())
+        
+        # Interpretasi t-test 2 sampel
+        p_value2 <- ttest2_safe$p.value
+        ttest2_interp <- if (p_value2 > 0.05) {
+          "Kesimpulan: Tidak ada perbedaan rata-rata yang signifikan antara kedua kelompok."
+        } else {
+          "Kesimpulan: Terdapat perbedaan rata-rata yang signifikan antara kedua kelompok."
+        }
+        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(ttest2_interp)
       } else {
         doc %>% body_add_par("Gagal: Uji ini memerlukan tepat 2 kategori.")
       }
@@ -837,7 +880,14 @@ server <- function(input, output, session) {
       )
       ft1 <- flextable(df_res1) %>% colformat_double(j = "Nilai", big.mark = "", digits = 4) %>% autofit() %>% theme_box()
       doc %>% body_add_flextable(ft1)
-      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$var1_test_interpretation())
+      # Interpretasi uji varians 1 sampel
+      p_value_var1 <- test_result1$p.value
+      var1_interp <- if (p_value_var1 > 0.05) {
+        paste0("Kesimpulan: Varians sampel tidak berbeda signifikan dari nilai hipotesis (", input$var1_sigma_sq, ").")
+      } else {
+        paste0("Kesimpulan: Varians sampel berbeda signifikan dari nilai hipotesis (", input$var1_sigma_sq, ").")
+      }
+      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(var1_interp)
       
       doc %>% body_add_par("Uji Varians Dua Sampel (F-Test)", style = "heading 2")
       doc %>% body_add_par(paste("Variabel:", input$var2_var, "| Grup:", input$variabel))
@@ -850,7 +900,15 @@ server <- function(input, output, session) {
         )
         ft2 <- flextable(df_res2) %>% colformat_double(j = "Nilai", big.mark = "", digits = 4) %>% autofit() %>% theme_box()
         doc %>% body_add_flextable(ft2)
-        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$var2_test_interpretation())
+        
+        # Interpretasi uji varians 2 sampel
+        p_value_var2 <- test_result2$p.value
+        var2_interp <- if (p_value_var2 > 0.05) {
+          "Kesimpulan: Tidak ada perbedaan varians yang signifikan antara kedua kelompok (varian homogen)."
+        } else {
+          "Kesimpulan: Terdapat perbedaan varians yang signifikan antara kedua kelompok (varian tidak homogen)."
+        }
+        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(var2_interp)
       } else {
         doc %>% body_add_par("Gagal: Uji ini memerlukan tepat 2 kategori yang diatur di tab 'Manajemen Data'.")
       }
@@ -1005,7 +1063,14 @@ server <- function(input, output, session) {
         )
         ft1 <- flextable(df_res1) %>% colformat_double(j = "Nilai", big.mark = "", digits = 4) %>% autofit() %>% theme_box()
         doc %>% body_add_flextable(ft1)
-        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$prop1_test_interpretation())
+        # Interpretasi uji proporsi 1 sampel
+        p_value_prop1 <- test_result1$p.value
+        prop1_interp <- if (p_value_prop1 > 0.05) {
+          paste0("Kesimpulan: Proporsi sampel tidak berbeda signifikan dari proporsi hipotesis (", input$prop1_p_hipotesis, ").")
+        } else {
+          paste0("Kesimpulan: Proporsi sampel berbeda signifikan dari proporsi hipotesis (", input$prop1_p_hipotesis, ").")
+        }
+        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(prop1_interp)
       }
       
       prop2_safe <- tryCatch(prop2_test_output(), error = function(e) e)
@@ -1018,7 +1083,15 @@ server <- function(input, output, session) {
         )
         ft2 <- flextable(df_res2) %>% colformat_double(j = "Nilai", big.mark = "", digits = 4) %>% autofit() %>% theme_box()
         doc %>% body_add_flextable(ft2)
-        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$prop2_test_interpretation())
+        
+        # Interpretasi uji proporsi 2 sampel
+        p_value_prop2 <- test_result2$p.value
+        prop2_interp <- if (p_value_prop2 > 0.05) {
+          "Kesimpulan: Tidak ada perbedaan proporsi yang signifikan antara kedua kelompok."
+        } else {
+          "Kesimpulan: Terdapat perbedaan proporsi yang signifikan antara kedua kelompok."
+        }
+        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(prop2_interp)
       }
       
       print(doc, target = file)
@@ -1096,7 +1169,14 @@ server <- function(input, output, session) {
         names(df_res)[names(df_res) == "Pr(>F)"] <- "P-value"
         ft <- flextable(df_res) %>% colformat_double(j = 2:6, big.mark = "", digits = 4) %>% autofit() %>% theme_box()
         doc %>% body_add_flextable(ft)
-        doc %>% body_add_par("Interpretasi:", style="heading 3") %>% body_add_par(output$anova1_interpretation())
+        # Interpretasi ANOVA
+        p_value_anova <- summary(anova1_model())[[1]][["Pr(>F)"]][1]
+        anova_interp <- if (p_value_anova < 0.05) {
+          "Hasil ANOVA signifikan (p < 0.05), menunjukkan bahwa setidaknya ada satu kelompok yang rata-ratanya berbeda secara signifikan dari yang lain. Lihat tabel Post-Hoc untuk melihat pasangan kelompok mana yang berbeda."
+        } else {
+          "Hasil ANOVA tidak signifikan (p >= 0.05), menunjukkan bahwa tidak ada perbedaan rata-rata yang signifikan antar kelompok."
+        }
+        doc %>% body_add_par("Interpretasi:", style="heading 3") %>% body_add_par(anova_interp)
         
         doc %>% body_add_par("Uji Lanjutan Tukey HSD", style="heading 3")
         res_posthoc <- as.data.frame(anova1_posthoc_model()$Kategori)
@@ -1291,19 +1371,55 @@ server <- function(input, output, session) {
       # Normalitas
       doc %>% body_add_par("1. Uji Normalitas Residual", style = "heading 2")
       doc %>% body_add_par(paste(capture.output(reg_norm_test_output()), collapse = "\n"))
-      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$reg_norm_test_interpretation())
+      
+      # Interpretasi normalitas residual
+      test_result_reg <- reg_norm_test_output()
+      if (!is.null(test_result_reg$error)) {
+        reg_norm_interp <- test_result_reg$error
+      } else {
+        p_value_reg <- test_result_reg$p.value
+        reg_norm_interp <- if (p_value_reg > 0.05) {
+          paste0("Kesimpulan: P-value (", round(p_value_reg, 4), ") > 0.05, maka residual berdistribusi normal.")
+        } else {
+          paste0("Kesimpulan: P-value (", round(p_value_reg, 4), ") <= 0.05, maka residual tidak berdistribusi normal.")
+        }
+      }
+      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(reg_norm_interp)
       
       # Autokorelasi
       doc %>% body_add_par("2. Uji Autokorelasi (Durbin-Watson)", style = "heading 2")
       doc %>% body_add_par(paste(capture.output(autokorelasi_test()), collapse = "\n"))
-      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$autokorelasi_test_interpretation())
+      
+      # Interpretasi autokorelasi
+      test_dw <- autokorelasi_test()
+      dw_stat <- test_dw$statistic
+      p_value_dw <- test_dw$p.value
+      
+      autokor_interp <- if (p_value_dw < 0.05) {
+        if (dw_stat < 2) {
+          "terindikasi adanya autokorelasi positif."
+        } else {
+          "terindikasi adanya autokorelasi negatif."
+        }
+      } else {
+        "tidak ada bukti kuat adanya autokorelasi (asumsi terpenuhi)."
+      }
+      autokor_interp <- paste0("Kesimpulan: P-value (", round(p_value_dw, 4), ") dan statistik DW (", round(dw_stat, 2), ") menunjukkan bahwa ", autokor_interp)
+      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(autokor_interp)
       
       # Multikolinearitas
       doc %>% body_add_par("3. Uji Multikolinearitas (VIF)", style = "heading 2")
       vif_df <- multikolinearitas_test()
       if (!is.null(vif_df)) {
         doc %>% body_add_flextable(flextable(vif_df) %>% autofit())
-        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$multikolinearitas_test_interpretation())
+        
+        # Interpretasi VIF
+        vif_interp <- if (any(vif_df$VIF > 10)) {
+          "Kesimpulan: Ditemukan setidaknya satu variabel dengan VIF > 10, mengindikasikan adanya masalah multikolinearitas yang serius."
+        } else {
+          "Kesimpulan: Semua variabel memiliki nilai VIF di bawah 10, menunjukkan tidak ada masalah multikolinearitas yang serius (asumsi terpenuhi)."
+        }
+        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(vif_interp)
       } else {
         doc %>% body_add_par("Tidak dapat melakukan uji VIF (memerlukan min. 2 variabel independen).")
       }
@@ -1311,7 +1427,16 @@ server <- function(input, output, session) {
       # Homoskedastisitas
       doc %>% body_add_par("4. Uji Homoskedastisitas (Breusch-Pagan)", style = "heading 2")
       doc %>% body_add_par(paste(capture.output(homoskedastisitas_test()), collapse = "\n"))
-      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$homoskedastisitas_test_interpretation())
+      
+      # Interpretasi homoskedastisitas
+      test_bp <- homoskedastisitas_test()
+      p_value_bp <- test_bp$p.value
+      homosked_interp <- if (p_value_bp > 0.05) {
+        paste0("Kesimpulan: P-value (", round(p_value_bp, 4), ") > 0.05, maka tidak ada bukti adanya heteroskedastisitas (varian residual homogen/asumsi terpenuhi).")
+      } else {
+        paste0("Kesimpulan: P-value (", round(p_value_bp, 4), ") <= 0.05, maka terindikasi adanya masalah heteroskedastisitas (varian residual tidak homogen).")
+      }
+      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(homosked_interp)
       
       print(doc, target = file)
     }
@@ -1602,7 +1727,25 @@ server <- function(input, output, session) {
         )
         doc %>% body_add_flextable(flextable(moran_table) %>% autofit())
         doc %>% body_add_par("Interpretasi:", style = "heading 3")
-        doc %>% body_add_par(output$moran_i_interpretation())
+        
+        # Buat interpretasi Moran's I secara langsung
+        moran_i <- results$moran$estimate[1]
+        p_value <- results$moran$p.value
+        
+        if(p_value < 0.05) {
+          if(moran_i > 0) {
+            interpretasi_moran <- paste0("Terdapat autokorelasi spasial positif yang signifikan (Moran's I = ", 
+                   round(moran_i, 4), ", p < 0.05). Kabupaten/kota dengan nilai tinggi cenderung bertetangga dengan yang bernilai tinggi, begitu juga sebaliknya.")
+          } else {
+            interpretasi_moran <- paste0("Terdapat autokorelasi spasial negatif yang signifikan (Moran's I = ", 
+                   round(moran_i, 4), ", p < 0.05). Kabupaten/kota dengan nilai tinggi cenderung bertetangga dengan yang bernilai rendah.")
+          }
+        } else {
+          interpretasi_moran <- paste0("Tidak terdapat autokorelasi spasial yang signifikan (Moran's I = ", 
+                 round(moran_i, 4), ", p = ", round(p_value, 4), "). Distribusi nilai bersifat acak secara spasial.")
+        }
+        
+        doc %>% body_add_par(interpretasi_moran)
       } else {
         doc %>% body_add_par("Moran's I tidak dapat dihitung karena keterbatasan data spasial.")
       }
@@ -1717,17 +1860,80 @@ server <- function(input, output, session) {
         Statistik = c("Mean", "Median", "Modus", "Min", "Max", "Range", "SD"),
         Nilai = as.character(round(c(mean(data, na.rm = TRUE), median(data, na.rm = TRUE), modus, min(data, na.rm = TRUE), max(data, na.rm = TRUE), diff(range(data, na.rm = TRUE)), sd(data, na.rm = TRUE)), 2))
       )
+      
+      # Buat interpretasi secara langsung
+      mean_val <- mean(data, na.rm = TRUE)
+      median_val <- median(data, na.rm = TRUE)
+      sd_val <- sd(data, na.rm = TRUE)
+      simpul <- ifelse(abs(mean_val - median_val) < sd_val * 0.1, "distribusi simetris", "distribusi tidak simetris")
+      interpretasi_text <- paste0("Rata-rata: ", round(mean_val, 2), ", Median: ", round(median_val, 2), ", SD: ", round(sd_val, 2), " → Data memiliki ", simpul, ".")
+      
       doc <- read_docx() %>% body_add_par(paste("Laporan Eksplorasi Variabel:", input$variabel_eksplorasi), style = "heading 1")
-      doc %>% body_add_flextable(flextable(stats_df))
-      doc %>% body_add_par("Interpretasi:", style = "heading 2") %>% body_add_par(output$interpretasi_stat())
+      doc %>% body_add_flextable(flextable(stats_df) %>% autofit())
+      doc %>% body_add_par("Interpretasi:", style = "heading 2") %>% body_add_par(interpretasi_text)
       print(doc, target = file)
     }
   )
   
   output$unduh_gabungan <- downloadHandler(
-    filename = function() "gabungan_eksplorasi.pdf",
+    filename = function() paste0("laporan_lengkap_eksplorasi_", Sys.Date(), ".docx"),
     content = function(file) {
-      writeLines("Fitur unduh gabungan akan segera dikembangkan.", file)
+      req(input$variabel_eksplorasi)
+      
+      # Data untuk analisis
+      df <- data_sosial()
+      var_eksplorasi <- input$variabel_eksplorasi
+      data <- df[[var_eksplorasi]]
+      modus <- as.numeric(names(sort(table(data), decreasing = TRUE)[1]))
+      
+      # Buat dokumen
+      doc <- read_docx() %>% 
+        body_add_par("Laporan Lengkap Eksplorasi Data", style = "heading 1")
+      
+      # Informasi umum
+      doc %>% body_add_par(paste("Variabel Analisis:", gsub("_", " ", var_eksplorasi)))
+      doc %>% body_add_par(paste("Tanggal Analisis:", Sys.Date()))
+      doc %>% body_add_par(paste("Jumlah Observasi:", nrow(df)))
+      
+      # Statistik deskriptif
+      doc %>% body_add_par("Statistik Deskriptif", style = "heading 2")
+      stats_df <- data.frame(
+        Statistik = c("Mean", "Median", "Modus", "Minimum", "Maksimum", "Range", "Standar Deviasi"),
+        Nilai = as.character(round(c(mean(data, na.rm = TRUE), median(data, na.rm = TRUE), modus, 
+                                   min(data, na.rm = TRUE), max(data, na.rm = TRUE), 
+                                   diff(range(data, na.rm = TRUE)), sd(data, na.rm = TRUE)), 2))
+      )
+      doc %>% body_add_flextable(flextable(stats_df) %>% autofit())
+      
+      # Interpretasi
+      doc %>% body_add_par("Interpretasi Statistik", style = "heading 2")
+      mean_val <- mean(data, na.rm = TRUE)
+      median_val <- median(data, na.rm = TRUE)
+      sd_val <- sd(data, na.rm = TRUE)
+      simpul <- ifelse(abs(mean_val - median_val) < sd_val * 0.1, "distribusi simetris", "distribusi tidak simetris")
+      interpretasi_text <- paste0("Rata-rata: ", round(mean_val, 2), ", Median: ", round(median_val, 2), 
+                                ", Standar Deviasi: ", round(sd_val, 2), ". Data memiliki ", simpul, ".")
+      doc %>% body_add_par(interpretasi_text)
+      
+      # Data peringkat tertinggi
+      doc %>% body_add_par("10 Kabupaten/Kota dengan Nilai Tertinggi", style = "heading 2")
+      top_data <- df %>%
+        select(all_of(c(nama_kolom_kode, nama_kolom_kabupaten, var_eksplorasi))) %>%
+        arrange(desc(.data[[var_eksplorasi]])) %>%
+        head(10)
+      names(top_data)[3] <- gsub("_", " ", var_eksplorasi)
+      doc %>% body_add_flextable(flextable(top_data) %>% autofit())
+      
+      # Data peringkat terendah
+      doc %>% body_add_par("10 Kabupaten/Kota dengan Nilai Terendah", style = "heading 2")
+      bottom_data <- df %>%
+        select(all_of(c(nama_kolom_kode, nama_kolom_kabupaten, var_eksplorasi))) %>%
+        arrange(.data[[var_eksplorasi]]) %>%
+        head(10)
+      names(bottom_data)[3] <- gsub("_", " ", var_eksplorasi)
+      doc %>% body_add_flextable(flextable(bottom_data) %>% autofit())
+      
+      print(doc, target = file)
     }
   )
 }
