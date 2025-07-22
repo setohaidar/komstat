@@ -3,7 +3,7 @@
 #----------------------------------------------------------------#
 
 # 1. PASTIKAN SEMUA LIBRARY INI SUDAH TERINSTALL
-# install.packages(c("shiny", "shinydashboard", "readxl", "DT", "officer", "flextable", "ggplot2", "dplyr", "sf", "leaflet", "car", "nortest", "EnvStats", "lmtest"))
+# install.packages(c("shiny", "shinydashboard", "readxl", "DT", "officer", "flextable", "ggplot2", "dplyr", "sf", "leaflet", "car", "nortest", "EnvStats", "lmtest", "cluster", "factoextra", "fpc"))
 
 library(shiny)
 library(shinydashboard)
@@ -19,6 +19,11 @@ library(car)
 library(nortest)
 library(EnvStats) 
 library(lmtest) # Ditambahkan untuk uji asumsi regresi
+library(cluster) # Untuk analisis clustering
+library(factoextra) # Untuk visualisasi clustering
+library(fpc) # Untuk validasi clustering
+library(scales) # Untuk formatting dalam plot
+
 
 #================================================================#
 #                           UI (USER INTERFACE)                  #
@@ -37,6 +42,7 @@ ui <- dashboardPage(
       menuItem("ANOVA (>2 Kelompok)", tabName = "anova", icon = icon("braille")),
       # --- MENU BARU DITAMBAHKAN DI SINI --- #
       menuItem("Regresi Linear Berganda", tabName = "regresi", icon = icon("line-chart")),
+      menuItem("Analisis Clustering K-Means", tabName = "clustering", icon = icon("project-diagram")),
       menuItem("Eksplorasi Data", tabName = "eksplorasi_data", icon = icon("chart-bar"))
     )
   ),
@@ -47,21 +53,187 @@ ui <- dashboardPage(
           white-space: normal !important;
           word-wrap: break-word;
         }
+        
+        /* Styling untuk output interpretasi */
+        .interpretation-output {
+          background-color: #f8f9fa;
+          border: 2px solid #e9ecef;
+          border-radius: 8px;
+          padding: 15px;
+          font-family: 'Courier New', monospace;
+          font-size: 13px;
+          line-height: 1.6;
+          color: #495057;
+          white-space: pre-wrap;
+          margin: 10px 0;
+        }
+        
+        /* Styling untuk hasil statistik */
+        .stats-output {
+          background-color: #fff3cd;
+          border: 2px solid #ffeaa7;
+          border-radius: 8px;
+          padding: 15px;
+          font-family: 'Courier New', monospace;
+          font-size: 13px;
+          line-height: 1.6;
+          color: #856404;
+          white-space: pre-wrap;
+          margin: 10px 0;
+        }
+        
+        /* Styling untuk p-value signifikan */
+        .significant {
+          background-color: #d4edda;
+          border: 2px solid #c3e6cb;
+          color: #155724;
+        }
+        
+        /* Styling untuk p-value tidak signifikan */
+        .not-significant {
+          background-color: #f8d7da;
+          border: 2px solid #f5c6cb;
+          color: #721c24;
+        }
+        
+        /* Styling untuk box header */
+        .box-header h3 {
+          font-size: 18px;
+          font-weight: bold;
+          color: #2c3e50;
+        }
+        
+        /* Styling untuk verbatim output */
+        pre {
+          background-color: #f8f9fa;
+          border: 1px solid #e9ecef;
+          border-radius: 6px;
+          padding: 12px;
+          font-size: 13px;
+          line-height: 1.5;
+          color: #495057;
+          overflow-x: auto;
+        }
       "))
     ),
     tabItems(
       tabItem(tabName = "beranda",
               fluidRow(
                 box(
-                  title = "Selamat Datang di Dashboard Analisis Sosial",
+                  title = "SIGABISA - Sistem Informasi Geospasial Ancaman Bencana berbasis Indikator Sosial",
                   width = 12, solidHeader = TRUE, status = "primary",
                   h4("Tentang Dashboard Ini"),
-                  p("Dashboard ini dirancang untuk menganalisis dan memvisualisasikan data kondisi sosial per kabupaten/kota."),
-                  h4("Metadata"),
-                  p("Data yang digunakan: 'Kondisi_Sosial_Per_KabKota_Excel.xlsx' dan 'Peta_Kabupaten_Kota.geojson'. Pastikan kedua file ini berada di folder yang sama dengan aplikasi."),
-                  p("Dibuat menggunakan R dan Shiny."),
+                  p("Dashboard ini dirancang untuk menganalisis dan memvisualisasikan data kondisi sosial per kabupaten/kota dalam konteks kerentanan terhadap bencana. Sistem ini mengintegrasikan data sosial-ekonomi untuk membantu identifikasi daerah yang rentan dan memerlukan perhatian khusus dalam mitigasi bencana."),
+                  
+                  h4("Sumber Data"),
+                  p("Data utama: 'Kondisi_Sosial_Per_KabKota_Excel.xlsx' dan 'Peta_Kabupaten_Kota.geojson'"),
+                  p("Sumber: Badan Pusat Statistik (BPS) dan instansi terkait"),
+                  
                   h4("Cara Penggunaan"),
-                  p("Gunakan menu di samping untuk bernavigasi. 'Manajemen Data' untuk kategorisasi, 'Uji Asumsi' untuk tes statistik, dan 'Eksplorasi Data' untuk visualisasi.")
+                  p("Gunakan menu di samping untuk bernavigasi:"),
+                  tags$ul(
+                    tags$li(strong("Manajemen Data:"), " Kategorisasi variabel dan ekspor data"),
+                    tags$li(strong("Uji Asumsi:"), " Uji normalitas dan homogenitas"),
+                    tags$li(strong("Uji Varians:"), " Analisis varians satu dan dua sampel"),
+                    tags$li(strong("Uji Proporsi:"), " Analisis proporsi kategori"),
+                    tags$li(strong("ANOVA:"), " Analisis varians antar kelompok"),
+                    tags$li(strong("Clustering K-Means:"), " Pengelompokan wilayah berdasarkan karakteristik sosial"),
+                    tags$li(strong("Regresi Linear:"), " Analisis hubungan antar variabel"),
+                    tags$li(strong("Eksplorasi Data:"), " Visualisasi dan analisis deskriptif")
+                  )
+                )
+              ),
+              fluidRow(
+                box(
+                  title = "Metadata Variabel",
+                  width = 12, solidHeader = TRUE, status = "info", collapsible = TRUE,
+                  p("Berikut adalah deskripsi lengkap untuk setiap variabel dalam dataset:"),
+                  
+                  tabsetPanel(
+                    tabPanel("Variabel Demografis",
+                             br(),
+                             h5(strong("Kode_Kab_Kota")),
+                             p("Kode Kabupaten atau Kota berdasarkan sumber BPS"),
+                             
+                             h5(strong("Nama_Kab_Kota")),
+                             p("Nama Kabupaten atau Kota"),
+                             
+                             h5(strong("Persentase_Penduduk_Dibawah_Lima_Tahun")),
+                             p("Persentase penduduk berusia kurang dari lima tahun di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Jumlah_Penduduk_Dibawah_Lima_Tahun")),
+                             p("Jumlah penduduk berusia kurang dari lima tahun di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Persentase_Populasi_Penduduk_Perempuan")),
+                             p("Persentase perempuan di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Jumlah_Penduduk_Perempuan")),
+                             p("Jumlah penduduk perempuan di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Persentase_Penduduk_Diatas_Enam_Puluh_Lima_Tahun")),
+                             p("Persentase penduduk berusia lebih dari enam puluh lima tahun di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Jumlah_Penduduk_Diatas_Enam_Puluh_Lima_Tahun")),
+                             p("Jumlah penduduk berusia lebih dari enam puluh lima tahun di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Jumlah_Penduduk")),
+                             p("Total jumlah penduduk di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Persentase_Perubahan_Penduduk")),
+                             p("Persentase perubahan jumlah penduduk di suatu kabupaten atau kota")
+                    ),
+                    
+                    tabPanel("Variabel Rumah Tangga",
+                             br(),
+                             h5(strong("Persentase_Rumah_Tangga_Dengan_Kepala_Keluarga_Perempuan")),
+                             p("Persentase rumah tangga di suatu kabupaten atau kota yang kepala keluarganya adalah Wanita"),
+                             
+                             h5(strong("Rata_Rata_Anggota_Rumah_Tangga_Di_Satu_Kabupaten_Kota")),
+                             p("Rata-rata jumlah anggota per setiap rumah tangga di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Persentase_Rumah_Tangga_Yang_Tidak_Menggunakan_Listrik_Sebagai_Sumber_Penerangan")),
+                             p("Persentase rumah tangga di suatu kabupaten atau kota yang sumber penerangan di rumahnya bukan menggunakan listrik"),
+                             
+                             h5(strong("Persentase_Rumah_Tangga_Yang_Menyewa_Rumah")),
+                             p("Persentase rumah tangga di suatu kabupaten atau kota yang menyewa rumah"),
+                             
+                             h5(strong("Persentase_Rumah_Tangga_Yang_Tidak_Memiliki_Sistem_Drainase")),
+                             p("Persentase rumah tangga di suatu kabupaten atau kota yang tidak memiliki sistem drainase"),
+                             
+                             h5(strong("Persentase_Rumah_Tangga_Pengguna_Air_Leding")),
+                             p("Persentase rumah tangga di suatu kabupaten atau kota yang menggunakan air leding sebagai sumber airnya")
+                    ),
+                    
+                    tabPanel("Variabel Pendidikan & Ekonomi",
+                             br(),
+                             h5(strong("Persentase_Penduduk_Usia_Lima_Belas_Tahun_Ke_Atas_Yang_Berpendidikan_Rendah")),
+                             p("Persentase penduduk berusia 15 tahun ke atas yang berpendidikan rendah di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Jumlah_Penduduk_Usia_Lima_Belas_Tahun_Ke_Atas_Yang_Berpendidikan_Rendah")),
+                             p("Jumlah penduduk berusia 15 tahun ke atas yang berpendidikan rendah di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Persentase_Penduduk_Yang_Tidak_Bisa_Baca_Tulis")),
+                             p("Persentase penduduk di suatu kabupaten atau kota yang tidak bisa membaca dan menulis"),
+                             
+                             h5(strong("Jumlah_Penduduk_Yang_Tidak_Bisa_Baca_Tulis")),
+                             p("Jumlah penduduk di suatu kabupaten atau kota yang tidak bisa membaca dan menulis"),
+                             
+                             h5(strong("Persentase_Penduduk_Miskin")),
+                             p("Persentase penduduk miskin di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Jumlah_Penduduk_Miskin")),
+                             p("Jumlah penduduk miskin di suatu kabupaten atau kota")
+                    ),
+                    
+                    tabPanel("Variabel Kebencanaan",
+                             br(),
+                             h5(strong("Persentase_Rumah_Tangga_Yang_Tidak_Mendapat_Pelatihan_Bencana")),
+                             p("Persentase rumah tangga yang tidak mendapat pelatihan mitigasi bencana di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Persentase_Rumah_Tangga_Yang_Tinggal_Di_Daerah_Rawan_Bencana")),
+                             p("Persentase rumah tangga di suatu kabupaten atau kota yang tinggal di daerah bencana")
+                    )
+                  )
                 )
               )
       ),
@@ -76,20 +248,33 @@ ui <- dashboardPage(
                   uiOutput("variabel_selector"),
                   selectInput("jumlah_kategori", "Pilih Jumlah Kategori:",
                               choices = c(2, 3, 5), selected = 3),
-                  hr(),
-                  h4("Unduh Hasil"),
-                  downloadButton("download_data", "Unduh Data (CSV)"),
-                  downloadButton("download_interpretasi", "Unduh Interpretasi (TXT)")
+                  
                 ),
                 box(
                   title = "Hasil Kategorisasi Data",
                   width = 8,
                   solidHeader = TRUE,
                   status = "primary",
-                  DTOutput("tabel_data"),
-                  hr(),
-                  h4("Interpretasi"),
-                  verbatimTextOutput("interpretasi_output")
+                  tabsetPanel(
+                    tabPanel("Tabel Data",
+                             DTOutput("tabel_data"),
+                             br(),
+                             h5("Keterangan:"),
+                             p("Tabel menampilkan data asli dengan kategori yang telah dibuat berdasarkan metode Equal Interval.")
+                    ),
+                    tabPanel("Ringkasan Statistik",
+                             DTOutput("summary_stats_table"),
+                             br(),
+                             h5("Keterangan:"),
+                             p("Statistik deskriptif untuk variabel yang dipilih dan distribusi per kategori.")
+                    ),
+                    tabPanel("Interpretasi",
+                             verbatimTextOutput("interpretasi_output"),
+                             br(),
+                             h5("Penjelasan Metode:"),
+                             p("Equal Interval: Membagi rentang nilai menjadi interval yang sama panjang berdasarkan nilai minimum dan maksimum data.")
+                    )
+                  )
                 )
               )
       ),
@@ -113,7 +298,8 @@ ui <- dashboardPage(
                            verbatimTextOutput("norm_test_result"),
                            hr(),
                            h5("Interpretasi:", style = "font-weight:bold;"),
-                           textOutput("norm_test_interpretation")
+                           div(class = "interpretation-output", 
+                               htmlOutput("norm_test_interpretation"))
                     )
                   )
                 )
@@ -139,12 +325,7 @@ ui <- dashboardPage(
                   )
                 )
               ),
-              fluidRow(
-                box(
-                  title = "Unduh Hasil", width = 12,
-                  downloadButton("download_asumsi", "Unduh Semua Hasil Uji (Word)")
-                )
-              )
+              
       ),
       
       tabItem(tabName = "uji_rata",
@@ -185,11 +366,7 @@ ui <- dashboardPage(
                     )
                 )
               ),
-              fluidRow(
-                box(title = "Unduh Hasil", width = 12,
-                    downloadButton("download_uji_rata", "Unduh Hasil Uji Rata-rata (Word)")
-                )
-              )
+              
       ),
       
       tabItem(tabName = "uji_varians",
@@ -230,11 +407,7 @@ ui <- dashboardPage(
                     )
                 )
               ),
-              fluidRow(
-                box(title = "Unduh Hasil", width = 12,
-                    downloadButton("download_uji_varians", "Unduh Hasil Uji Varians (Word)")
-                )
-              )
+              
       ),
       
       tabItem(tabName = "uji_proporsi",
@@ -283,11 +456,7 @@ ui <- dashboardPage(
                   textOutput("prop2_test_interpretation")
                 )
               ),
-              fluidRow(
-                box(title = "Unduh Hasil", width = 12,
-                    downloadButton("download_uji_proporsi", "Unduh Hasil Uji Proporsi (Word)")
-                )
-              )
+              
       ),
       
       tabItem(tabName = "anova",
@@ -315,14 +484,70 @@ ui <- dashboardPage(
                   )
                 )
               ),
-              fluidRow(
-                box(title = "Unduh Hasil", width = 12,
-                    downloadButton("download_anova", "Unduh Hasil ANOVA (Word)")
-                )
-              )
+              
       ),
       
       # --- KONTEN HALAMAN BARU DITAMBAHKAN DI SINI --- #
+      tabItem(tabName = "clustering",
+              fluidRow(
+                box(
+                  title = "Pengaturan Analisis Clustering K-Means", width = 4, solidHeader = TRUE, status = "primary",
+                  h4("Pilih Variabel untuk Clustering"),
+                  uiOutput("clustering_var_selector"),
+                  helpText("Pilih variabel numerik yang akan digunakan dalam analisis clustering."),
+                  
+                  hr(),
+                  h4("Pengaturan Clustering"),
+                  numericInput("num_clusters", "Jumlah Cluster (k):", value = 3, min = 2, max = 10),
+                  checkboxInput("use_distance_matrix", "Gunakan Matriks Penimbang Jarak", value = TRUE),
+                  helpText("Jika dicentang, akan menggunakan matriks penimbang jarak dari file Excel."),
+                  
+                  hr(),
+                  actionButton("run_clustering", "Jalankan Analisis Clustering", icon = icon("play-circle"), class = "btn-primary"),
+                  
+                  
+                ),
+                box(
+                  title = "Hasil Clustering", width = 8, solidHeader = TRUE, status = "primary",
+                  tabsetPanel(
+                    tabPanel("Ringkasan Hasil",
+                             h4("Informasi Cluster"),
+                             DTOutput("cluster_summary_table"),
+                             hr(),
+                             h4("Statistik Cluster"),
+                             verbatimTextOutput("cluster_stats")
+                    ),
+                    tabPanel("Daftar Wilayah per Cluster",
+                             h4("Daftar Nama Wilayah Berdasarkan Cluster"),
+                             helpText("Tabel ini menunjukkan nama wilayah (kabupaten/kota) dan cluster yang mereka masuki."),
+                             DTOutput("region_cluster_table"),
+                             hr(),
+                             h4("Ringkasan Jumlah Wilayah per Cluster"),
+                             DTOutput("cluster_count_table")
+                    ),
+                    tabPanel("Validasi Cluster",
+                             h4("Metrik Validasi Clustering"),
+                             DTOutput("cluster_validation_table"),
+                             hr(),
+                             h4("Interpretasi"),
+                             verbatimTextOutput("cluster_interpretation")
+                    )
+                  )
+                )
+              ),
+              fluidRow(
+                box(
+                  title = "Visualisasi Clustering", width = 6, solidHeader = TRUE, status = "info",
+                  plotOutput("cluster_plot", height = "400px")
+                ),
+                box(
+                  title = "Elbow Method untuk Menentukan k Optimal", width = 6, solidHeader = TRUE, status = "info",
+                  plotOutput("elbow_plot", height = "400px")
+                )
+              ),
+              
+      ),
+      
       tabItem(tabName = "regresi",
               fluidRow(
                 box(
@@ -333,10 +558,8 @@ ui <- dashboardPage(
                   # --- BARIS INSTRUKSI DITAMBAHKAN DI SINI --- #
                   helpText("Tahan tombol Ctrl (Windows) atau Cmd (Mac) untuk memilih beberapa variabel."),
                   
-                  actionButton("run_regression", "Jalankan Analisis Regresi", icon = icon("play-circle")),
-                  hr(),
-                  h4("Unduh Hasil"),
-                  downloadButton("download_regresi", "Unduh Hasil Regresi (Word)")
+                  actionButton("run_regression", "Jalankan Analisis Regresi", icon = icon("play-circle"))
+                  
                 ),
                 box(
                   title = "Hasil Model Regresi Linear Berganda", width = 8, solidHeader = TRUE, status = "primary",
@@ -396,8 +619,7 @@ ui <- dashboardPage(
                                choices = c("10 Tertinggi" = "top", "10 Terendah" = "bottom"),
                                selected = "top"),
                   hr(),
-                  downloadButton("unduh_laporan", "Unduh Laporan (Word)"),
-                  downloadButton("unduh_gabungan", "Unduh Semua Halaman")
+                  
                 ),
                 box(
                   title = "Statistik Deskriptif", width = 8, status = "info", solidHeader = TRUE,
@@ -455,6 +677,16 @@ server <- function(input, output, session) {
     sf::st_read("Peta_Kabupaten_Kota.geojson")
   })
   
+  # Memuat matriks penimbang jarak
+  distance_matrix <- reactive({
+    req(file.exists("Matriks_Penimbang_Jarak.xlsx"))
+    tryCatch({
+      read_excel("Matriks_Penimbang_Jarak.xlsx")
+    }, error = function(e) {
+      NULL
+    })
+  })
+  
   #--- LOGIKA UNTUK MANAJEMEN DATA ---#
   output$variabel_selector <- renderUI({
     df <- data_sosial()
@@ -491,13 +723,79 @@ server <- function(input, output, session) {
   output$tabel_data <- renderDT({
     req(input$variabel)
     data_to_show <- kategori_info()$data %>% select(all_of(nama_kolom_kode), all_of(nama_kolom_kabupaten), all_of(input$variabel), Kategori)
-    dt <- datatable(data_to_show, rownames = FALSE, options = list(pageLength = 10, scrollX = TRUE), selection = 'none')
+    dt <- datatable(data_to_show, 
+                    rownames = FALSE, 
+                    options = list(pageLength = 10, scrollX = TRUE), 
+                    selection = 'none',
+                    filter = 'top')
     if (input$variabel %in% jumlah_vars) {
       dt <- dt %>% formatRound(columns = input$variabel, digits = 0, mark = "")
     } else {
       dt <- dt %>% formatRound(columns = input$variabel, digits = 2, mark = "", dec.mark = ".")
     }
-    dt
+    
+    # Tambahkan color coding untuk kategori
+    dt %>% formatStyle('Kategori',
+                       backgroundColor = styleEqual(
+                         unique(data_to_show$Kategori),
+                         rainbow(length(unique(data_to_show$Kategori)), alpha = 0.3)
+                       ))
+  })
+  
+  # Tabel ringkasan statistik
+  output$summary_stats_table <- renderDT({
+    req(input$variabel)
+    
+    # Statistik deskriptif variabel asli
+    data_original <- data_sosial()[[input$variabel]]
+    info <- kategori_info()
+    
+    # Statistik umum
+    stats_umum <- data.frame(
+      Metrik = c("Total Observasi", "Nilai Minimum", "Nilai Maksimum", "Rata-rata", "Median", "Standar Deviasi", "Varians"),
+      Nilai = c(
+        length(data_original),
+        round(min(data_original, na.rm = TRUE), 3),
+        round(max(data_original, na.rm = TRUE), 3),
+        round(mean(data_original, na.rm = TRUE), 3),
+        round(median(data_original, na.rm = TRUE), 3),
+        round(sd(data_original, na.rm = TRUE), 3),
+        round(var(data_original, na.rm = TRUE), 3)
+      ),
+      Kategori = rep("Statistik Umum", 7)
+    )
+    
+    # Statistik per kategori
+    kategori_counts <- table(info$data$Kategori)
+    stats_kategori <- data.frame(
+      Metrik = paste("Jumlah", names(kategori_counts)),
+      Nilai = as.numeric(kategori_counts),
+      Kategori = rep("Distribusi Kategori", length(kategori_counts))
+    )
+    
+    # Persentase per kategori
+    stats_persen <- data.frame(
+      Metrik = paste("Persentase", names(kategori_counts)),
+      Nilai = paste0(round(as.numeric(kategori_counts) / sum(kategori_counts) * 100, 1), "%"),
+      Kategori = rep("Persentase", length(kategori_counts))
+    )
+    
+    # Gabungkan semua statistik
+    all_stats <- rbind(stats_umum, stats_kategori, stats_persen)
+    
+    datatable(all_stats, 
+              options = list(
+                pageLength = 15, 
+                scrollX = TRUE,
+                dom = 't'
+              ), 
+              rownames = FALSE) %>%
+      formatStyle('Kategori', fontWeight = 'bold') %>%
+      formatStyle('Kategori',
+                  backgroundColor = styleEqual(
+                    c("Statistik Umum", "Distribusi Kategori", "Persentase"),
+                    c("#e8f4f8", "#f0f8e8", "#f8f0e8")
+                  ))
   })
   
   output$interpretasi_output <- renderText({
@@ -512,20 +810,6 @@ server <- function(input, output, session) {
     paste0("Interpretasi:\n\nVariabel '", input$variabel, "' dikategorikan menjadi ",
            length(info$labels), " kelompok.\nMetode: Equal Interval.\n\nRentang Nilai:\n", rentang_teks)
   })
-  
-  output$download_data <- downloadHandler(
-    filename = function() paste0("hasil_kategorisasi_", input$variabel, ".csv"),
-    content = function(file) {
-      write.csv(kategori_info()$data, file, row.names = FALSE)
-    }
-  )
-  
-  output$download_interpretasi <- downloadHandler(
-    filename = function() paste0("interpretasi_", input$variabel, ".txt"),
-    content = function(file) {
-      writeLines(output$interpretasi_output(), file)
-    }
-  )
   
   #--- LOGIKA UNTUK UJI ASUMSI ---#
   output$norm_var_selector <- renderUI({
@@ -567,11 +851,43 @@ server <- function(input, output, session) {
     if (!is.null(test_result$error)) cat(test_result$error) else test_result
   })
   
-  output$norm_test_interpretation <- renderText({
+  output$norm_test_interpretation <- renderUI({
     test_result <- norm_test_output(); req(test_result)
     if (!is.null(test_result$error)) return("")
+    
     p_value <- test_result$p.value
-    if (p_value > 0.05) paste0("Kesimpulan: P-value (", round(p_value, 4), ") > 0.05, maka data berdistribusi normal.") else paste0("Kesimpulan: P-value (", round(p_value, 4), ") <= 0.05, maka data tidak berdistribusi normal.")
+    statistic <- test_result$statistic
+    method <- test_result$method
+    
+    # Format hasil statistik
+    stat_text <- if(input$norm_test_method == "shapiro") {
+      paste0("Statistik W = ", round(statistic, 4))
+    } else {
+      paste0("Statistik D = ", round(statistic, 4))
+    }
+    
+    # Interpretasi berdasarkan p-value dengan HTML formatting
+    significance_class <- if (p_value > 0.05) "not-significant" else "significant"
+    
+    if (p_value > 0.05) {
+      div(class = significance_class,
+          HTML(paste0("<strong>HASIL UJI NORMALITAS:</strong><br/>",
+                      "Metode: ", method, "<br/>",
+                      stat_text, "<br/>",
+                      "<strong>P-value = ", round(p_value, 4), "</strong><br/><br/>",
+                      "<strong>INTERPRETASI:</strong><br/>",
+                      "Karena P-value (", round(p_value, 4), ") > α (0.05), maka H₀ diterima.<br/>",
+                      "<strong>KESIMPULAN:</strong> Data berdistribusi normal pada tingkat signifikansi 5%.")))
+    } else {
+      div(class = significance_class,
+          HTML(paste0("<strong>HASIL UJI NORMALITAS:</strong><br/>",
+                      "Metode: ", method, "<br/>",
+                      stat_text, "<br/>",
+                      "<strong>P-value = ", round(p_value, 4), "</strong><br/><br/>",
+                      "<strong>INTERPRETASI:</strong><br/>",
+                      "Karena P-value (", round(p_value, 4), ") ≤ α (0.05), maka H₀ ditolak.<br/>",
+                      "<strong>KESIMPULAN:</strong> Data tidak berdistribusi normal pada tingkat signifikansi 5%.")))
+    }
   })
   
   homog_test_output <- reactive({
@@ -592,31 +908,32 @@ server <- function(input, output, session) {
   output$homog_test_interpretation <- renderText({
     test_result <- homog_test_output(); req(test_result)
     p_value <- test_result$`Pr(>F)`[1]
+    f_value <- test_result$`F value`[1]
+    df1 <- test_result$Df[1]
+    df2 <- test_result$Df[2]
+    
     if (is.na(p_value)) return("Tidak dapat mengambil P-value.")
-    if (p_value > 0.05) paste0("Kesimpulan: P-value (", round(p_value, 4), ") > 0.05, maka varian antar kelompok homogen.") else paste0("Kesimpulan: P-value (", round(p_value, 4), ") <= 0.05, maka varian antar kelompok tidak homogen.")
+    
+    # Interpretasi berdasarkan p-value
+    if (p_value > 0.05) {
+      paste0("HASIL UJI HOMOGENITAS VARIAN (Levene's Test):\n",
+             "Statistik F = ", round(f_value, 4), "\n",
+             "Derajat bebas = ", df1, ", ", df2, "\n",
+             "P-value = ", round(p_value, 4), "\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") > α (0.05), maka H₀ diterima.\n",
+             "KESIMPULAN: Varian antar kelompok adalah homogen (sama) pada tingkat signifikansi 5%.")
+    } else {
+      paste0("HASIL UJI HOMOGENITAS VARIAN (Levene's Test):\n",
+             "Statistik F = ", round(f_value, 4), "\n",
+             "Derajat bebas = ", df1, ", ", df2, "\n",
+             "P-value = ", round(p_value, 4), "\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") ≤ α (0.05), maka H₀ ditolak.\n",
+             "KESIMPULAN: Varian antar kelompok tidak homogen (berbeda) pada tingkat signifikansi 5%.")
+    }
   })
   
-  output$download_asumsi <- downloadHandler(
-    filename = function() paste0("hasil_uji_asumsi_", Sys.Date(), ".docx"),
-    content = function(file) {
-      doc <- read_docx() %>% body_add_par("Hasil Uji Asumsi", style = "heading 1")
-      doc %>% body_add_par(if(input$norm_test_method == "shapiro") "Uji Normalitas (Shapiro-Wilk)" else "Uji Normalitas (Kolmogorov-Smirnov)", style = "heading 2")
-      doc %>% body_add_par(paste("Variabel:", input$norm_var))
-      doc %>% body_add_par(paste(capture.output(norm_test_output()), collapse="\n"))
-      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$norm_test_interpretation())
-      doc %>% body_add_par("Uji Homogenitas Varian (Levene's Test)", style = "heading 2")
-      doc %>% body_add_par(paste("Variabel:", input$homog_var, "| Grup:", input$variabel))
-      homog_output <- tryCatch(homog_test_output(), error = function(e) e)
-      if (!inherits(homog_output, "error")) {
-        df_homog <- as.data.frame(homog_output) %>% tibble::rownames_to_column("Sumber")
-        doc %>% body_add_flextable(flextable(df_homog) %>% autofit())
-        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$homog_test_interpretation())
-      } else {
-        doc %>% body_add_par(paste("Error:", as.character(homog_output)))
-      }
-      print(doc, target = file)
-    }
-  )
   
   #--- LOGIKA UNTUK UJI BEDA RATA-RATA ---#
   output$ttest1_var_selector <- renderUI({
@@ -659,26 +976,6 @@ server <- function(input, output, session) {
     if (p_value > 0.05) "Kesimpulan: Tidak ada perbedaan rata-rata yang signifikan antara kedua kelompok." else "Kesimpulan: Terdapat perbedaan rata-rata yang signifikan antara kedua kelompok."
   })
   
-  output$download_uji_rata <- downloadHandler(
-    filename = function() paste0("hasil_uji_rata-rata_", Sys.Date(), ".docx"),
-    content = function(file) {
-      doc <- read_docx() %>% body_add_par("Hasil Uji Beda Rata-rata", style = "heading 1")
-      doc %>% body_add_par("Uji-t Satu Sampel", style = "heading 2")
-      doc %>% body_add_par(paste("Variabel:", input$ttest1_var, "| Nilai Hipotesis:", input$ttest1_mu))
-      doc %>% body_add_par(paste(capture.output(ttest1_output()), collapse="\n"))
-      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$ttest1_interpretation())
-      doc %>% body_add_par("Uji-t Dua Sampel Independen", style = "heading 2")
-      doc %>% body_add_par(paste("Variabel:", input$ttest2_var, "| Grup:", input$variabel))
-      ttest2_safe <- tryCatch(ttest2_output(), error=function(e)e)
-      if(!inherits(ttest2_safe, "error")){
-        doc %>% body_add_par(paste(capture.output(ttest2_safe), collapse="\n"))
-        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$ttest2_interpretation())
-      } else {
-        doc %>% body_add_par("Gagal: Uji ini memerlukan tepat 2 kategori.")
-      }
-      print(doc, target = file)
-    }
-  )
   
   #--- LOGIKA UNTUK UJI VARIANS ---#
   output$var1_var_selector <- renderUI({
@@ -711,8 +1008,33 @@ server <- function(input, output, session) {
   })
   
   output$var1_test_interpretation <- renderText({
-    p_value <- var1_test_output()$p.value
-    if (p_value > 0.05) paste0("Kesimpulan: Varians sampel tidak berbeda signifikan dari nilai hipotesis (", input$var1_sigma_sq, ").") else paste0("Kesimpulan: Varians sampel berbeda signifikan dari nilai hipotesis (", input$var1_sigma_sq, ").")
+    test_result <- var1_test_output()
+    p_value <- test_result$p.value
+    chi_sq <- test_result$statistic
+    df <- test_result$parameters
+    sample_var <- test_result$estimate
+    
+    if (p_value > 0.05) {
+      paste0("HASIL UJI VARIANS SATU SAMPEL (Chi-Square Test):\n",
+             "Statistik χ² = ", round(chi_sq, 4), "\n",
+             "Derajat bebas = ", df, "\n",
+             "P-value = ", round(p_value, 4), "\n",
+             "Varians sampel = ", round(sample_var, 4), "\n",
+             "Varians hipotesis = ", input$var1_sigma_sq, "\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") > α (0.05), maka H₀ diterima.\n",
+             "KESIMPULAN: Varians sampel tidak berbeda signifikan dari nilai hipotesis pada tingkat signifikansi 5%.")
+    } else {
+      paste0("HASIL UJI VARIANS SATU SAMPEL (Chi-Square Test):\n",
+             "Statistik χ² = ", round(chi_sq, 4), "\n",
+             "Derajat bebas = ", df, "\n",
+             "P-value = ", round(p_value, 4), "\n",
+             "Varians sampel = ", round(sample_var, 4), "\n",
+             "Varians hipotesis = ", input$var1_sigma_sq, "\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") ≤ α (0.05), maka H₀ ditolak.\n",
+             "KESIMPULAN: Varians sampel berbeda signifikan dari nilai hipotesis pada tingkat signifikansi 5%.")
+    }
   })
   
   output$var2_var_selector <- renderUI({
@@ -747,44 +1069,34 @@ server <- function(input, output, session) {
   })
   
   output$var2_test_interpretation <- renderText({
-    p_value <- var2_test_output()$p.value
-    if (p_value > 0.05) "Kesimpulan: Tidak ada perbedaan varians yang signifikan antara kedua kelompok (varian homogen)." else "Kesimpulan: Terdapat perbedaan varians yang signifikan antara kedua kelompok (varian tidak homogen)."
+    test_result <- var2_test_output()
+    p_value <- test_result$p.value
+    f_stat <- test_result$statistic
+    df1 <- test_result$parameter[1]
+    df2 <- test_result$parameter[2]
+    ratio <- test_result$estimate
+    
+    if (p_value > 0.05) {
+      paste0("HASIL UJI VARIANS DUA SAMPEL (F-Test):\n",
+             "Statistik F = ", round(f_stat, 4), "\n",
+             "Derajat bebas = ", df1, ", ", df2, "\n",
+             "P-value = ", round(p_value, 4), "\n",
+             "Rasio varians = ", round(ratio, 4), "\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") > α (0.05), maka H₀ diterima.\n",
+             "KESIMPULAN: Tidak ada perbedaan varians yang signifikan antara kedua kelompok (varian homogen) pada tingkat signifikansi 5%.")
+    } else {
+      paste0("HASIL UJI VARIANS DUA SAMPEL (F-Test):\n",
+             "Statistik F = ", round(f_stat, 4), "\n",
+             "Derajat bebas = ", df1, ", ", df2, "\n",
+             "P-value = ", round(p_value, 4), "\n",
+             "Rasio varians = ", round(ratio, 4), "\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") ≤ α (0.05), maka H₀ ditolak.\n",
+             "KESIMPULAN: Terdapat perbedaan varians yang signifikan antara kedua kelompok (varian tidak homogen) pada tingkat signifikansi 5%.")
+    }
   })
   
-  output$download_uji_varians <- downloadHandler(
-    filename = function() paste0("hasil_uji_varians_", Sys.Date(), ".docx"),
-    content = function(file) {
-      doc <- read_docx() %>% body_add_par("Hasil Uji Varians", style = "heading 1")
-      
-      doc %>% body_add_par("Uji Varians Satu Sampel (Chi-Square Test)", style = "heading 2")
-      doc %>% body_add_par(paste("Variabel:", input$var1_var, "| Nilai Hipotesis Varians:", input$var1_sigma_sq))
-      test_result1 <- var1_test_output()
-      df_res1 <- data.frame(
-        Statistik = c("Statistik Chi-Square", "Derajat Bebas (df)", "P-value", "Varians Sampel"),
-        Nilai = c(test_result1$statistic, test_result1$parameters, test_result1$p.value, test_result1$estimate)
-      )
-      ft1 <- flextable(df_res1) %>% colformat_double(j = "Nilai", big.mark = "", digits = 4) %>% autofit() %>% theme_box()
-      doc %>% body_add_flextable(ft1)
-      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$var1_test_interpretation())
-      
-      doc %>% body_add_par("Uji Varians Dua Sampel (F-Test)", style = "heading 2")
-      doc %>% body_add_par(paste("Variabel:", input$var2_var, "| Grup:", input$variabel))
-      var2_safe <- tryCatch(var2_test_output(), error = function(e) e)
-      if (!inherits(var2_safe, "error")) {
-        test_result2 <- var2_safe
-        df_res2 <- data.frame(
-          Statistik = c("Statistik F", "Derajat Bebas Numerator", "Derajat Bebas Denominator", "P-value", "Rasio Varians"),
-          Nilai = c(test_result2$statistic, test_result2$parameter[1], test_result2$parameter[2], test_result2$p.value, test_result2$estimate)
-        )
-        ft2 <- flextable(df_res2) %>% colformat_double(j = "Nilai", big.mark = "", digits = 4) %>% autofit() %>% theme_box()
-        doc %>% body_add_flextable(ft2)
-        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$var2_test_interpretation())
-      } else {
-        doc %>% body_add_par("Gagal: Uji ini memerlukan tepat 2 kategori yang diatur di tab 'Manajemen Data'.")
-      }
-      print(doc, target = file)
-    }
-  )
   
   #--- LOGIKA UNTUK UJI PROPORSI ---#
   prop_data <- reactiveVal(NULL)
@@ -854,11 +1166,35 @@ server <- function(input, output, session) {
   
   output$prop1_test_interpretation <- renderText({
     validate(need(!is.null(prop_data()), ""))
-    p_value <- prop1_test_output()$p.value
+    test_result <- prop1_test_output()
+    p_value <- test_result$p.value
+    chi_sq <- test_result$statistic
+    df <- test_result$parameter
+    sample_prop <- test_result$estimate
+    conf_int <- test_result$conf.int
+    
     if (p_value > 0.05) {
-      paste0("Kesimpulan: Proporsi sampel tidak berbeda signifikan dari proporsi hipotesis (", input$prop1_p_hipotesis, ").")
+      paste0("HASIL UJI PROPORSI SATU SAMPEL:\n",
+             "Statistik χ² = ", round(chi_sq, 4), "\n",
+             "Derajat bebas = ", df, "\n",
+             "P-value = ", round(p_value, 4), "\n",
+             "Proporsi sampel = ", round(sample_prop, 4), " (", round(sample_prop*100, 1), "%)\n",
+             "Proporsi hipotesis = ", input$prop1_p_hipotesis, " (", round(input$prop1_p_hipotesis*100, 1), "%)\n",
+             "Interval kepercayaan 95% = [", round(conf_int[1], 4), ", ", round(conf_int[2], 4), "]\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") > α (0.05), maka H₀ diterima.\n",
+             "KESIMPULAN: Proporsi sampel tidak berbeda signifikan dari proporsi hipotesis pada tingkat signifikansi 5%.")
     } else {
-      paste0("Kesimpulan: Proporsi sampel berbeda signifikan dari proporsi hipotesis (", input$prop1_p_hipotesis, ").")
+      paste0("HASIL UJI PROPORSI SATU SAMPEL:\n",
+             "Statistik χ² = ", round(chi_sq, 4), "\n",
+             "Derajat bebas = ", df, "\n",
+             "P-value = ", round(p_value, 4), "\n",
+             "Proporsi sampel = ", round(sample_prop, 4), " (", round(sample_prop*100, 1), "%)\n",
+             "Proporsi hipotesis = ", input$prop1_p_hipotesis, " (", round(input$prop1_p_hipotesis*100, 1), "%)\n",
+             "Interval kepercayaan 95% = [", round(conf_int[1], 4), ", ", round(conf_int[2], 4), "]\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") ≤ α (0.05), maka H₀ ditolak.\n",
+             "KESIMPULAN: Proporsi sampel berbeda signifikan dari proporsi hipotesis pada tingkat signifikansi 5%.")
     }
   })
   
@@ -910,48 +1246,39 @@ server <- function(input, output, session) {
   
   output$prop2_test_interpretation <- renderText({
     validate(need(!is.null(prop_data()), ""))
-    p_value <- prop2_test_output()$p.value
+    test_result <- prop2_test_output()
+    p_value <- test_result$p.value
+    chi_sq <- test_result$statistic
+    df <- test_result$parameter
+    prop1 <- test_result$estimate[1]
+    prop2 <- test_result$estimate[2]
+    
     if (p_value > 0.05) {
-      "Kesimpulan: Tidak ada perbedaan proporsi yang signifikan antara kedua kelompok."
+      paste0("HASIL UJI PROPORSI DUA SAMPEL:\n",
+             "Statistik χ² = ", round(chi_sq, 4), "\n",
+             "Derajat bebas = ", df, "\n",
+             "P-value = ", round(p_value, 4), "\n",
+             "Proporsi ", input$prop2_group1, " = ", round(prop1, 4), " (", round(prop1*100, 1), "%)\n",
+             "Proporsi ", input$prop2_group2, " = ", round(prop2, 4), " (", round(prop2*100, 1), "%)\n",
+             "Selisih proporsi = ", round(abs(prop1 - prop2), 4), "\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") > α (0.05), maka H₀ diterima.\n",
+             "KESIMPULAN: Tidak ada perbedaan proporsi yang signifikan antara kedua kelompok pada tingkat signifikansi 5%.")
     } else {
-      "Kesimpulan: Terdapat perbedaan proporsi yang signifikan antara kedua kelompok."
+      paste0("HASIL UJI PROPORSI DUA SAMPEL:\n",
+             "Statistik χ² = ", round(chi_sq, 4), "\n",
+             "Derajat bebas = ", df, "\n",
+             "P-value = ", round(p_value, 4), "\n",
+             "Proporsi ", input$prop2_group1, " = ", round(prop1, 4), " (", round(prop1*100, 1), "%)\n",
+             "Proporsi ", input$prop2_group2, " = ", round(prop2, 4), " (", round(prop2*100, 1), "%)\n",
+             "Selisih proporsi = ", round(abs(prop1 - prop2), 4), "\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") ≤ α (0.05), maka H₀ ditolak.\n",
+             "KESIMPULAN: Terdapat perbedaan proporsi yang signifikan antara kedua kelompok pada tingkat signifikansi 5%.")
     }
   })
   
-  output$download_uji_proporsi <- downloadHandler(
-    filename = function() paste0("hasil_uji_proporsi_", Sys.Date(), ".docx"),
-    content = function(file) {
-      doc <- read_docx() %>% body_add_par("Hasil Uji Proporsi", style = "heading 1")
-      
-      prop1_safe <- tryCatch(prop1_test_output(), error = function(e) e)
-      if (!inherits(prop1_safe, "error")) {
-        doc %>% body_add_par("Uji Proporsi Satu Sampel", style = "heading 2")
-        test_result1 <- prop1_safe
-        df_res1 <- data.frame(
-          Statistik = c("Statistik Chi-Square", "Derajat Bebas (df)", "P-value", "Proporsi Sampel"),
-          Nilai = c(test_result1$statistic, test_result1$parameter, test_result1$p.value, test_result1$estimate)
-        )
-        ft1 <- flextable(df_res1) %>% colformat_double(j = "Nilai", big.mark = "", digits = 4) %>% autofit() %>% theme_box()
-        doc %>% body_add_flextable(ft1)
-        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$prop1_test_interpretation())
-      }
-      
-      prop2_safe <- tryCatch(prop2_test_output(), error = function(e) e)
-      if (!inherits(prop2_safe, "error")) {
-        doc %>% body_add_par("Uji Proporsi Dua Sampel", style = "heading 2")
-        test_result2 <- prop2_safe
-        df_res2 <- data.frame(
-          Statistik = c("Statistik Chi-Square", "Derajat Bebas (df)", "P-value", "Proporsi Kelompok 1", "Proporsi Kelompok 2"),
-          Nilai = c(test_result2$statistic, test_result2$parameter, test_result2$p.value, test_result2$estimate[1], test_result2$estimate[2])
-        )
-        ft2 <- flextable(df_res2) %>% colformat_double(j = "Nilai", big.mark = "", digits = 4) %>% autofit() %>% theme_box()
-        doc %>% body_add_flextable(ft2)
-        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$prop2_test_interpretation())
-      }
-      
-      print(doc, target = file)
-    }
-  )
+  
   
   #--- LOGIKA UNTUK ANOVA ---#
   
@@ -1004,41 +1331,351 @@ server <- function(input, output, session) {
   })
   
   output$anova1_interpretation <- renderText({
-    p_value <- summary(anova1_model())[[1]][["Pr(>F)"]][1]
+    anova_summary <- summary(anova1_model())[[1]]
+    p_value <- anova_summary[["Pr(>F)"]][1]
+    f_value <- anova_summary[["F value"]][1]
+    df1 <- anova_summary[["Df"]][1]
+    df2 <- anova_summary[["Df"]][2]
+    
     if (p_value < 0.05) {
-      "Hasil ANOVA signifikan (p < 0.05), menunjukkan bahwa setidaknya ada satu kelompok yang rata-ratanya berbeda secara signifikan dari yang lain. Lihat tabel Post-Hoc untuk melihat pasangan kelompok mana yang berbeda."
+      paste0("HASIL ANALISIS VARIANS (ANOVA):\n",
+             "Statistik F = ", round(f_value, 4), "\n",
+             "Derajat bebas = ", df1, ", ", df2, "\n",
+             "P-value = ", round(p_value, 4), "\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") < α (0.05), maka H₀ ditolak.\n",
+             "KESIMPULAN: Terdapat perbedaan rata-rata yang signifikan antar kelompok pada tingkat signifikansi 5%.\n\n",
+             "SARAN: Lihat tabel Post-Hoc Tukey HSD untuk mengetahui pasangan kelompok mana yang berbeda secara signifikan.")
     } else {
-      "Hasil ANOVA tidak signifikan (p >= 0.05), menunjukkan bahwa tidak ada perbedaan rata-rata yang signifikan antar kelompok."
+      paste0("HASIL ANALISIS VARIANS (ANOVA):\n",
+             "Statistik F = ", round(f_value, 4), "\n",
+             "Derajat bebas = ", df1, ", ", df2, "\n",
+             "P-value = ", round(p_value, 4), "\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") ≥ α (0.05), maka H₀ diterima.\n",
+             "KESIMPULAN: Tidak ada perbedaan rata-rata yang signifikan antar kelompok pada tingkat signifikansi 5%.")
     }
   })
   
-  output$download_anova <- downloadHandler(
-    filename = function() paste0("hasil_anova_", Sys.Date(), ".docx"),
-    content = function(file) {
-      doc <- read_docx() %>% body_add_par("Hasil Analisis Varians (ANOVA)", style = "heading 1")
-      
-      doc %>% body_add_par("ANOVA Satu Arah", style = "heading 2")
-      anova1_safe <- tryCatch({
-        df_res <- as.data.frame(summary(anova1_model())[[1]])
-        df_res <- tibble::rownames_to_column(df_res, "Sumber Variasi")
-        names(df_res)[names(df_res) == "Pr(>F)"] <- "P-value"
-        ft <- flextable(df_res) %>% colformat_double(j = 2:6, big.mark = "", digits = 4) %>% autofit() %>% theme_box()
-        doc %>% body_add_flextable(ft)
-        doc %>% body_add_par("Interpretasi:", style="heading 3") %>% body_add_par(output$anova1_interpretation())
-        
-        doc %>% body_add_par("Uji Lanjutan Tukey HSD", style="heading 3")
-        res_posthoc <- as.data.frame(anova1_posthoc_model()$Kategori)
-        res_posthoc <- tibble::rownames_to_column(res_posthoc, "Perbandingan")
-        names(res_posthoc)[names(res_posthoc) == "p adj"] <- "P-value Adjusted"
-        ft_posthoc <- flextable(res_posthoc) %>% colformat_double(j = 2:5, big.mark = "", digits = 4) %>% autofit() %>% theme_box()
-        doc %>% body_add_flextable(ft_posthoc)
-      }, error = function(e) {
-        doc %>% body_add_par(paste("Gagal menjalankan ANOVA Satu Arah:", e$message))
-      })
-      
-      print(doc, target = file)
+  
+  # --- LOGIKA BARU UNTUK ANALISIS CLUSTERING K-MEANS --- #
+  
+  # Selector untuk variabel clustering
+  output$clustering_var_selector <- renderUI({
+    df <- data_sosial()
+    kolom_numerik <- names(df)[sapply(df, is.numeric)]
+    kolom_numerik <- setdiff(kolom_numerik, nama_kolom_kode)
+    selectInput("clustering_vars", "Pilih Variabel untuk Clustering:",
+                choices = kolom_numerik, multiple = TRUE, 
+                selected = kolom_numerik[1:min(3, length(kolom_numerik))])
+  })
+  
+  # Reactive untuk menyimpan hasil clustering
+  clustering_results <- eventReactive(input$run_clustering, {
+    req(input$clustering_vars, input$num_clusters)
+    
+    df <- data_sosial()
+    validate(
+      need(length(input$clustering_vars) >= 2, "Pilih setidaknya 2 variabel untuk clustering."),
+      need(input$num_clusters >= 2 && input$num_clusters <= 10, "Jumlah cluster harus antara 2-10.")
+    )
+    
+    # Persiapkan data untuk clustering
+    clustering_data <- df %>%
+      select(all_of(c(nama_kolom_kode, nama_kolom_kabupaten, input$clustering_vars))) %>%
+      filter(complete.cases(.))
+    
+    # Standardisasi data
+    data_for_clustering <- scale(clustering_data[, input$clustering_vars, drop = FALSE])
+    rownames(data_for_clustering) <- clustering_data[[nama_kolom_kode]]
+    
+    # Terapkan matriks penimbang jarak jika dipilih
+    if (input$use_distance_matrix && !is.null(distance_matrix())) {
+      dist_matrix <- distance_matrix()
+      # Coba cocokkan dengan kode kabupaten
+      if (nama_kolom_kode %in% names(dist_matrix)) {
+        common_codes <- intersect(clustering_data[[nama_kolom_kode]], dist_matrix[[nama_kolom_kode]])
+        if (length(common_codes) > 0) {
+          # Filter data berdasarkan kode yang ada di matriks jarak
+          clustering_data <- clustering_data[clustering_data[[nama_kolom_kode]] %in% common_codes, ]
+          data_for_clustering <- scale(clustering_data[, input$clustering_vars, drop = FALSE])
+          rownames(data_for_clustering) <- clustering_data[[nama_kolom_kode]]
+        }
+      }
     }
-  )
+    
+    # Jalankan K-means clustering
+    set.seed(123) # Untuk reproducibility
+    kmeans_result <- kmeans(data_for_clustering, centers = input$num_clusters, nstart = 25)
+    
+    # Tambahkan hasil cluster ke data
+    clustering_data$Cluster <- as.factor(kmeans_result$cluster)
+    
+    # Hitung metrik validasi
+    silhouette_score <- mean(silhouette(kmeans_result$cluster, dist(data_for_clustering))[, 3])
+    within_ss <- kmeans_result$tot.withinss
+    between_ss <- kmeans_result$betweenss
+    total_ss <- kmeans_result$totss
+    
+    # Hitung elbow method untuk k optimal
+    wss <- sapply(2:8, function(k) {
+      kmeans(data_for_clustering, centers = k, nstart = 10)$tot.withinss
+    })
+    
+    list(
+      data = clustering_data,
+      scaled_data = data_for_clustering,
+      kmeans_result = kmeans_result,
+      silhouette_score = silhouette_score,
+      within_ss = within_ss,
+      between_ss = between_ss,
+      total_ss = total_ss,
+      wss_values = wss,
+      variables_used = input$clustering_vars
+    )
+  })
+  
+  # Tabel ringkasan cluster
+  output$cluster_summary_table <- renderDT({
+    results <- clustering_results()
+    req(results)
+    
+    summary_data <- results$data %>%
+      group_by(Cluster) %>%
+      summarise(
+        Jumlah_Observasi = n(),
+        .groups = "drop"
+      )
+    
+    # Tambahkan statistik deskriptif untuk setiap variabel
+    for (var in results$variables_used) {
+      var_stats <- results$data %>%
+        group_by(Cluster) %>%
+        summarise(
+          mean_val = round(mean(.data[[var]], na.rm = TRUE), 2),
+          .groups = "drop"
+        )
+      summary_data[[paste0("Rata_rata_", gsub("_", "_", var))]] <- var_stats$mean_val
+    }
+    
+    datatable(summary_data, 
+              options = list(pageLength = 10, scrollX = TRUE), 
+              rownames = FALSE)
+  })
+  
+  # Statistik cluster
+  output$cluster_stats <- renderPrint({
+    results <- clustering_results()
+    req(results)
+    
+    cat("=== STATISTIK CLUSTERING ===\n\n")
+    cat("Jumlah Cluster:", input$num_clusters, "\n")
+    cat("Jumlah Observasi:", nrow(results$data), "\n")
+    cat("Variabel yang Digunakan:", paste(results$variables_used, collapse = ", "), "\n\n")
+    
+    cat("=== METRIK KUALITAS CLUSTERING ===\n")
+    cat("Silhouette Score:", round(results$silhouette_score, 4), "\n")
+    cat("Total Within Sum of Squares:", round(results$within_ss, 2), "\n")
+    cat("Between Sum of Squares:", round(results$between_ss, 2), "\n")
+    cat("Total Sum of Squares:", round(results$total_ss, 2), "\n")
+    cat("Proporsi Varians Dijelaskan:", round(results$between_ss / results$total_ss * 100, 2), "%\n\n")
+    
+    cat("=== PUSAT CLUSTER (STANDARDIZED) ===\n")
+    print(round(results$kmeans_result$centers, 3))
+  })
+  
+  # Tabel daftar wilayah per cluster
+  output$region_cluster_table <- renderDT({
+    results <- clustering_results()
+    req(results)
+    
+    # Buat tabel dengan nama wilayah dan cluster
+    region_table <- results$data %>%
+      select(all_of(c(nama_kolom_kode, nama_kolom_kabupaten, "Cluster"))) %>%
+      arrange(Cluster, !!sym(nama_kolom_kabupaten)) %>%
+      rename(
+        "Kode" = !!sym(nama_kolom_kode),
+        "Nama Wilayah" = !!sym(nama_kolom_kabupaten),
+        "Cluster" = "Cluster"
+      )
+    
+    datatable(region_table, 
+              options = list(
+                pageLength = 15, 
+                scrollX = TRUE,
+                columnDefs = list(
+                  list(className = 'dt-center', targets = c(0, 2))
+                )
+              ), 
+              rownames = FALSE,
+              filter = 'top') %>%
+      formatStyle('Cluster',
+                  backgroundColor = styleEqual(
+                    unique(region_table$Cluster),
+                    rainbow(length(unique(region_table$Cluster)), alpha = 0.3)
+                  ))
+  })
+  
+  # Tabel ringkasan jumlah wilayah per cluster
+  output$cluster_count_table <- renderDT({
+    results <- clustering_results()
+    req(results)
+    
+    count_table <- results$data %>%
+      group_by(Cluster) %>%
+      summarise(
+        Jumlah_Wilayah = n(),
+        Contoh_Wilayah = paste(head(!!sym(nama_kolom_kabupaten), 3), collapse = ", "),
+        .groups = "drop"
+      ) %>%
+      arrange(Cluster)
+    
+    datatable(count_table, 
+              options = list(
+                dom = 't',
+                columnDefs = list(
+                  list(className = 'dt-center', targets = c(0, 1))
+                )
+              ), 
+              rownames = FALSE) %>%
+      formatStyle('Cluster',
+                  backgroundColor = styleEqual(
+                    count_table$Cluster,
+                    rainbow(nrow(count_table), alpha = 0.3)
+                  ))
+  })
+  
+  # Tabel validasi cluster
+  output$cluster_validation_table <- renderDT({
+    results <- clustering_results()
+    req(results)
+    
+    validation_data <- data.frame(
+      Metrik = c("Silhouette Score", "Within Sum of Squares", "Between Sum of Squares", 
+                 "Total Sum of Squares", "Proporsi Varians Dijelaskan (%)"),
+      Nilai = c(
+        round(results$silhouette_score, 4),
+        round(results$within_ss, 2),
+        round(results$between_ss, 2),
+        round(results$total_ss, 2),
+        round(results$between_ss / results$total_ss * 100, 2)
+      )
+    )
+    
+    datatable(validation_data, options = list(dom = 't'), rownames = FALSE)
+  })
+  
+  # Interpretasi clustering
+  output$cluster_interpretation <- renderText({
+    results <- clustering_results()
+    req(results)
+    
+    sil_score <- results$silhouette_score
+    var_explained <- results$between_ss / results$total_ss * 100
+    within_ss <- results$within_ss
+    between_ss <- results$between_ss
+    total_ss <- results$total_ss
+    
+    sil_interpretation <- if (sil_score > 0.7) {
+      "sangat baik (excellent)"
+    } else if (sil_score > 0.5) {
+      "baik (good)"
+    } else if (sil_score > 0.25) {
+      "cukup (fair)"
+    } else {
+      "kurang baik (poor)"
+    }
+    
+    paste0(
+      "HASIL ANALISIS CLUSTERING K-MEANS:\n",
+      "Jumlah cluster = ", input$num_clusters, "\n",
+      "Jumlah observasi = ", nrow(results$data), "\n",
+      "Variabel yang digunakan = ", paste(results$variables_used, collapse = ", "), "\n\n",
+      "METRIK KUALITAS CLUSTERING:\n",
+      "Silhouette Score = ", round(sil_score, 4), "\n",
+      "Within Sum of Squares = ", round(within_ss, 2), "\n",
+      "Between Sum of Squares = ", round(between_ss, 2), "\n",
+      "Total Sum of Squares = ", round(total_ss, 2), "\n",
+      "Varians yang dijelaskan = ", round(var_explained, 2), "%\n\n",
+      "INTERPRETASI:\n",
+      "1. Kualitas Clustering: Silhouette score sebesar ", round(sil_score, 4), 
+      " menunjukkan bahwa kualitas clustering ", sil_interpretation, ".\n\n",
+      "2. Varians yang Dijelaskan: Model clustering menjelaskan ", 
+      round(var_explained, 2), "% dari total varians dalam data.\n\n",
+      "3. Evaluasi: ",
+      if (sil_score > 0.5) {
+        "Hasil clustering dapat diandalkan untuk analisis lebih lanjut dan interpretasi bisnis."
+      } else {
+        "Pertimbangkan untuk mengubah jumlah cluster atau variabel yang digunakan untuk meningkatkan kualitas clustering."
+      }
+    )
+  })
+  
+  # Plot clustering
+  output$cluster_plot <- renderPlot({
+    results <- clustering_results()
+    req(results)
+    
+    # Gunakan PCA untuk visualisasi jika lebih dari 2 variabel
+    if (length(results$variables_used) > 2) {
+      pca_result <- prcomp(results$scaled_data, scale. = FALSE)
+      plot_data <- data.frame(
+        PC1 = pca_result$x[, 1],
+        PC2 = pca_result$x[, 2],
+        Cluster = results$data$Cluster,
+        Kabupaten = results$data[[nama_kolom_kabupaten]]
+      )
+      
+      ggplot(plot_data, aes(x = PC1, y = PC2, color = Cluster)) +
+        geom_point(size = 3, alpha = 0.7) +
+        geom_text(aes(label = substr(Kabupaten, 1, 10)), size = 2.5, vjust = -1) +
+        labs(title = "Hasil Clustering K-Means (PCA Plot)",
+             x = paste0("PC1 (", round(summary(pca_result)$importance[2, 1] * 100, 1), "%)"),
+             y = paste0("PC2 (", round(summary(pca_result)$importance[2, 2] * 100, 1), "%)")) +
+        theme_minimal() +
+        theme(legend.position = "bottom")
+    } else {
+      # Plot 2D jika hanya 2 variabel
+      plot_data <- data.frame(
+        X = results$scaled_data[, 1],
+        Y = results$scaled_data[, 2],
+        Cluster = results$data$Cluster,
+        Kabupaten = results$data[[nama_kolom_kabupaten]]
+      )
+      
+      ggplot(plot_data, aes(x = X, y = Y, color = Cluster)) +
+        geom_point(size = 3, alpha = 0.7) +
+        geom_text(aes(label = substr(Kabupaten, 1, 10)), size = 2.5, vjust = -1) +
+        labs(title = "Hasil Clustering K-Means",
+             x = results$variables_used[1],
+             y = results$variables_used[2]) +
+        theme_minimal() +
+        theme(legend.position = "bottom")
+    }
+  })
+  
+  # Elbow plot
+  output$elbow_plot <- renderPlot({
+    results <- clustering_results()
+    req(results)
+    
+    elbow_data <- data.frame(
+      k = 2:8,
+      wss = results$wss_values
+    )
+    
+    ggplot(elbow_data, aes(x = k, y = wss)) +
+      geom_line(size = 1, color = "blue") +
+      geom_point(size = 3, color = "red") +
+      geom_vline(xintercept = input$num_clusters, linetype = "dashed", color = "green") +
+      labs(title = "Elbow Method untuk Menentukan Jumlah Cluster Optimal",
+           x = "Jumlah Cluster (k)",
+           y = "Within Sum of Squares") +
+      theme_minimal() +
+      scale_x_continuous(breaks = 2:8)
+  })
+  
+  
   
   # --- LOGIKA BARU UNTUK REGRESI LINEAR BERGANDA --- #
   
@@ -1197,53 +1834,6 @@ server <- function(input, output, session) {
     }
   })
   
-  # Download Handler untuk Regresi
-  output$download_regresi <- downloadHandler(
-    filename = function() paste0("hasil_regresi_", Sys.Date(), ".docx"),
-    content = function(file) {
-      doc <- read_docx() %>% 
-        body_add_par("Hasil Analisis Regresi Linear Berganda", style = "heading 1")
-      
-      # Hasil Model
-      doc %>% body_add_par("Ringkasan Model Regresi", style = "heading 2")
-      model <- reg_model_reactive()
-      if (!is.null(model)) {
-        doc %>% body_add_par(paste(capture.output(summary(model)), collapse = "\n"))
-      } else {
-        doc %>% body_add_par("Model belum dijalankan atau gagal.")
-      }
-      
-      # Uji Asumsi
-      doc %>% body_add_par("Hasil Uji Asumsi Klasik", style = "heading 1")
-      
-      # Normalitas
-      doc %>% body_add_par("1. Uji Normalitas Residual", style = "heading 2")
-      doc %>% body_add_par(paste(capture.output(reg_norm_test_output()), collapse = "\n"))
-      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$reg_norm_test_interpretation())
-      
-      # Autokorelasi
-      doc %>% body_add_par("2. Uji Autokorelasi (Durbin-Watson)", style = "heading 2")
-      doc %>% body_add_par(paste(capture.output(autokorelasi_test()), collapse = "\n"))
-      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$autokorelasi_test_interpretation())
-      
-      # Multikolinearitas
-      doc %>% body_add_par("3. Uji Multikolinearitas (VIF)", style = "heading 2")
-      vif_df <- multikolinearitas_test()
-      if (!is.null(vif_df)) {
-        doc %>% body_add_flextable(flextable(vif_df) %>% autofit())
-        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$multikolinearitas_test_interpretation())
-      } else {
-        doc %>% body_add_par("Tidak dapat melakukan uji VIF (memerlukan min. 2 variabel independen).")
-      }
-      
-      # Homoskedastisitas
-      doc %>% body_add_par("4. Uji Homoskedastisitas (Breusch-Pagan)", style = "heading 2")
-      doc %>% body_add_par(paste(capture.output(homoskedastisitas_test()), collapse = "\n"))
-      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$homoskedastisitas_test_interpretation())
-      
-      print(doc, target = file)
-    }
-  )
   
   
   #--- LOGIKA UNTUK EKSPLORASI DATA ---#
@@ -1333,29 +1923,7 @@ server <- function(input, output, session) {
       theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16), legend.position = "bottom", legend.key.width = unit(1.5, "cm"))
   }, res = 96)
   
-  output$unduh_laporan <- downloadHandler(
-    filename = function() paste0("eksplorasi_", input$variabel_eksplorasi, ".docx"),
-    content = function(file) {
-      req(input$variabel_eksplorasi)
-      data <- data_sosial()[[input$variabel_eksplorasi]]
-      modus <- as.numeric(names(sort(table(data), decreasing = TRUE)[1]))
-      stats_df <- data.frame(
-        Statistik = c("Mean", "Median", "Modus", "Min", "Max", "Range", "SD"),
-        Nilai = as.character(round(c(mean(data, na.rm = TRUE), median(data, na.rm = TRUE), modus, min(data, na.rm = TRUE), max(data, na.rm = TRUE), diff(range(data, na.rm = TRUE)), sd(data, na.rm = TRUE)), 2))
-      )
-      doc <- read_docx() %>% body_add_par(paste("Laporan Eksplorasi Variabel:", input$variabel_eksplorasi), style = "heading 1")
-      doc %>% body_add_flextable(flextable(stats_df))
-      doc %>% body_add_par("Interpretasi:", style = "heading 2") %>% body_add_par(output$interpretasi_stat())
-      print(doc, target = file)
-    }
-  )
   
-  output$unduh_gabungan <- downloadHandler(
-    filename = function() "gabungan_eksplorasi.pdf",
-    content = function(file) {
-      writeLines("Fitur unduh gabungan akan segera dikembangkan.", file)
-    }
-  )
 }
 
 #================================================================#
