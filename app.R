@@ -60,15 +60,120 @@ ui <- dashboardPage(
       tabItem(tabName = "beranda",
               fluidRow(
                 box(
-                  title = "Selamat Datang di Dashboard Analisis Sosial",
+                  title = "SIGABISA - Sistem Informasi Geospasial Ancaman Bencana berbasis Indikator Sosial",
                   width = 12, solidHeader = TRUE, status = "primary",
                   h4("Tentang Dashboard Ini"),
-                  p("Dashboard ini dirancang untuk menganalisis dan memvisualisasikan data kondisi sosial per kabupaten/kota."),
-                  h4("Metadata"),
-                  p("Data yang digunakan: 'Kondisi_Sosial_Per_KabKota_Excel.xlsx' dan 'Peta_Kabupaten_Kota.geojson'. Pastikan kedua file ini berada di folder yang sama dengan aplikasi."),
-                  p("Dibuat menggunakan R dan Shiny."),
+                  p("Dashboard ini dirancang untuk menganalisis dan memvisualisasikan data kondisi sosial per kabupaten/kota dalam konteks kerentanan terhadap bencana. Sistem ini mengintegrasikan data sosial-ekonomi untuk membantu identifikasi daerah yang rentan dan memerlukan perhatian khusus dalam mitigasi bencana."),
+                  
+                  h4("Sumber Data"),
+                  p("Data utama: 'Kondisi_Sosial_Per_KabKota_Excel.xlsx' dan 'Peta_Kabupaten_Kota.geojson'"),
+                  p("Sumber: Badan Pusat Statistik (BPS) dan instansi terkait"),
+                  
                   h4("Cara Penggunaan"),
-                  p("Gunakan menu di samping untuk bernavigasi. 'Manajemen Data' untuk kategorisasi, 'Uji Asumsi' untuk tes statistik, dan 'Eksplorasi Data' untuk visualisasi.")
+                  p("Gunakan menu di samping untuk bernavigasi:"),
+                  tags$ul(
+                    tags$li(strong("Manajemen Data:"), " Kategorisasi variabel dan ekspor data"),
+                    tags$li(strong("Uji Asumsi:"), " Uji normalitas dan homogenitas"),
+                    tags$li(strong("Uji Varians:"), " Analisis varians satu dan dua sampel"),
+                    tags$li(strong("Uji Proporsi:"), " Analisis proporsi kategori"),
+                    tags$li(strong("ANOVA:"), " Analisis varians antar kelompok"),
+                    tags$li(strong("Clustering K-Means:"), " Pengelompokan wilayah berdasarkan karakteristik sosial"),
+                    tags$li(strong("Regresi Linear:"), " Analisis hubungan antar variabel"),
+                    tags$li(strong("Eksplorasi Data:"), " Visualisasi dan analisis deskriptif")
+                  )
+                )
+              ),
+              fluidRow(
+                box(
+                  title = "Metadata Variabel",
+                  width = 12, solidHeader = TRUE, status = "info", collapsible = TRUE,
+                  p("Berikut adalah deskripsi lengkap untuk setiap variabel dalam dataset:"),
+                  
+                  tabsetPanel(
+                    tabPanel("Variabel Demografis",
+                             br(),
+                             h5(strong("Kode_Kab_Kota")),
+                             p("Kode Kabupaten atau Kota berdasarkan sumber BPS"),
+                             
+                             h5(strong("Nama_Kab_Kota")),
+                             p("Nama Kabupaten atau Kota"),
+                             
+                             h5(strong("Persentase_Penduduk_Dibawah_Lima_Tahun")),
+                             p("Persentase penduduk berusia kurang dari lima tahun di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Jumlah_Penduduk_Dibawah_Lima_Tahun")),
+                             p("Jumlah penduduk berusia kurang dari lima tahun di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Persentase_Populasi_Penduduk_Perempuan")),
+                             p("Persentase perempuan di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Jumlah_Penduduk_Perempuan")),
+                             p("Jumlah penduduk perempuan di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Persentase_Penduduk_Diatas_Enam_Puluh_Lima_Tahun")),
+                             p("Persentase penduduk berusia lebih dari enam puluh lima tahun di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Jumlah_Penduduk_Diatas_Enam_Puluh_Lima_Tahun")),
+                             p("Jumlah penduduk berusia lebih dari enam puluh lima tahun di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Jumlah_Penduduk")),
+                             p("Total jumlah penduduk di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Persentase_Perubahan_Penduduk")),
+                             p("Persentase perubahan jumlah penduduk di suatu kabupaten atau kota")
+                    ),
+                    
+                    tabPanel("Variabel Rumah Tangga",
+                             br(),
+                             h5(strong("Persentase_Rumah_Tangga_Dengan_Kepala_Keluarga_Perempuan")),
+                             p("Persentase rumah tangga di suatu kabupaten atau kota yang kepala keluarganya adalah Wanita"),
+                             
+                             h5(strong("Rata_Rata_Anggota_Rumah_Tangga_Di_Satu_Kabupaten_Kota")),
+                             p("Rata-rata jumlah anggota per setiap rumah tangga di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Persentase_Rumah_Tangga_Yang_Tidak_Menggunakan_Listrik_Sebagai_Sumber_Penerangan")),
+                             p("Persentase rumah tangga di suatu kabupaten atau kota yang sumber penerangan di rumahnya bukan menggunakan listrik"),
+                             
+                             h5(strong("Persentase_Rumah_Tangga_Yang_Menyewa_Rumah")),
+                             p("Persentase rumah tangga di suatu kabupaten atau kota yang menyewa rumah"),
+                             
+                             h5(strong("Persentase_Rumah_Tangga_Yang_Tidak_Memiliki_Sistem_Drainase")),
+                             p("Persentase rumah tangga di suatu kabupaten atau kota yang tidak memiliki sistem drainase"),
+                             
+                             h5(strong("Persentase_Rumah_Tangga_Pengguna_Air_Leding")),
+                             p("Persentase rumah tangga di suatu kabupaten atau kota yang menggunakan air leding sebagai sumber airnya")
+                    ),
+                    
+                    tabPanel("Variabel Pendidikan & Ekonomi",
+                             br(),
+                             h5(strong("Persentase_Penduduk_Usia_Lima_Belas_Tahun_Ke_Atas_Yang_Berpendidikan_Rendah")),
+                             p("Persentase penduduk berusia 15 tahun ke atas yang berpendidikan rendah di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Jumlah_Penduduk_Usia_Lima_Belas_Tahun_Ke_Atas_Yang_Berpendidikan_Rendah")),
+                             p("Jumlah penduduk berusia 15 tahun ke atas yang berpendidikan rendah di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Persentase_Penduduk_Yang_Tidak_Bisa_Baca_Tulis")),
+                             p("Persentase penduduk di suatu kabupaten atau kota yang tidak bisa membaca dan menulis"),
+                             
+                             h5(strong("Jumlah_Penduduk_Yang_Tidak_Bisa_Baca_Tulis")),
+                             p("Jumlah penduduk di suatu kabupaten atau kota yang tidak bisa membaca dan menulis"),
+                             
+                             h5(strong("Persentase_Penduduk_Miskin")),
+                             p("Persentase penduduk miskin di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Jumlah_Penduduk_Miskin")),
+                             p("Jumlah penduduk miskin di suatu kabupaten atau kota")
+                    ),
+                    
+                    tabPanel("Variabel Kebencanaan",
+                             br(),
+                             h5(strong("Persentase_Rumah_Tangga_Yang_Tidak_Mendapat_Pelatihan_Bencana")),
+                             p("Persentase rumah tangga yang tidak mendapat pelatihan mitigasi bencana di suatu kabupaten atau kota"),
+                             
+                             h5(strong("Persentase_Rumah_Tangga_Yang_Tinggal_Di_Daerah_Rawan_Bencana")),
+                             p("Persentase rumah tangga di suatu kabupaten atau kota yang tinggal di daerah bencana")
+                    )
+                  )
                 )
               )
       ),
