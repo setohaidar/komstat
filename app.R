@@ -53,6 +53,67 @@ ui <- dashboardPage(
           white-space: normal !important;
           word-wrap: break-word;
         }
+        
+        /* Styling untuk output interpretasi */
+        .interpretation-output {
+          background-color: #f8f9fa;
+          border: 2px solid #e9ecef;
+          border-radius: 8px;
+          padding: 15px;
+          font-family: 'Courier New', monospace;
+          font-size: 13px;
+          line-height: 1.6;
+          color: #495057;
+          white-space: pre-wrap;
+          margin: 10px 0;
+        }
+        
+        /* Styling untuk hasil statistik */
+        .stats-output {
+          background-color: #fff3cd;
+          border: 2px solid #ffeaa7;
+          border-radius: 8px;
+          padding: 15px;
+          font-family: 'Courier New', monospace;
+          font-size: 13px;
+          line-height: 1.6;
+          color: #856404;
+          white-space: pre-wrap;
+          margin: 10px 0;
+        }
+        
+        /* Styling untuk p-value signifikan */
+        .significant {
+          background-color: #d4edda;
+          border: 2px solid #c3e6cb;
+          color: #155724;
+        }
+        
+        /* Styling untuk p-value tidak signifikan */
+        .not-significant {
+          background-color: #f8d7da;
+          border: 2px solid #f5c6cb;
+          color: #721c24;
+        }
+        
+        /* Styling untuk box header */
+        .box-header h3 {
+          font-size: 18px;
+          font-weight: bold;
+          color: #2c3e50;
+        }
+        
+        /* Styling untuk verbatim output */
+        pre {
+          background-color: #f8f9fa;
+          border: 1px solid #e9ecef;
+          border-radius: 6px;
+          padding: 12px;
+          font-size: 13px;
+          line-height: 1.5;
+          color: #495057;
+          overflow-x: auto;
+        }
       "))
     ),
     tabItems(
@@ -237,7 +298,8 @@ ui <- dashboardPage(
                            verbatimTextOutput("norm_test_result"),
                            hr(),
                            h5("Interpretasi:", style = "font-weight:bold;"),
-                           textOutput("norm_test_interpretation")
+                           div(class = "interpretation-output", 
+                               htmlOutput("norm_test_interpretation"))
                     )
                   )
                 )
@@ -789,11 +851,43 @@ server <- function(input, output, session) {
     if (!is.null(test_result$error)) cat(test_result$error) else test_result
   })
   
-  output$norm_test_interpretation <- renderText({
+  output$norm_test_interpretation <- renderUI({
     test_result <- norm_test_output(); req(test_result)
     if (!is.null(test_result$error)) return("")
+    
     p_value <- test_result$p.value
-    if (p_value > 0.05) paste0("Kesimpulan: P-value (", round(p_value, 4), ") > 0.05, maka data berdistribusi normal.") else paste0("Kesimpulan: P-value (", round(p_value, 4), ") <= 0.05, maka data tidak berdistribusi normal.")
+    statistic <- test_result$statistic
+    method <- test_result$method
+    
+    # Format hasil statistik
+    stat_text <- if(input$norm_test_method == "shapiro") {
+      paste0("Statistik W = ", round(statistic, 4))
+    } else {
+      paste0("Statistik D = ", round(statistic, 4))
+    }
+    
+    # Interpretasi berdasarkan p-value dengan HTML formatting
+    significance_class <- if (p_value > 0.05) "not-significant" else "significant"
+    
+    if (p_value > 0.05) {
+      div(class = significance_class,
+          HTML(paste0("<strong>HASIL UJI NORMALITAS:</strong><br/>",
+                     "Metode: ", method, "<br/>",
+                     stat_text, "<br/>",
+                     "<strong>P-value = ", round(p_value, 4), "</strong><br/><br/>",
+                     "<strong>INTERPRETASI:</strong><br/>",
+                     "Karena P-value (", round(p_value, 4), ") > α (0.05), maka H₀ diterima.<br/>",
+                     "<strong>KESIMPULAN:</strong> Data berdistribusi normal pada tingkat signifikansi 5%.")))
+    } else {
+      div(class = significance_class,
+          HTML(paste0("<strong>HASIL UJI NORMALITAS:</strong><br/>",
+                     "Metode: ", method, "<br/>",
+                     stat_text, "<br/>",
+                     "<strong>P-value = ", round(p_value, 4), "</strong><br/><br/>",
+                     "<strong>INTERPRETASI:</strong><br/>",
+                     "Karena P-value (", round(p_value, 4), ") ≤ α (0.05), maka H₀ ditolak.<br/>",
+                     "<strong>KESIMPULAN:</strong> Data tidak berdistribusi normal pada tingkat signifikansi 5%.")))
+    }
   })
   
   homog_test_output <- reactive({
@@ -814,8 +908,30 @@ server <- function(input, output, session) {
   output$homog_test_interpretation <- renderText({
     test_result <- homog_test_output(); req(test_result)
     p_value <- test_result$`Pr(>F)`[1]
+    f_value <- test_result$`F value`[1]
+    df1 <- test_result$Df[1]
+    df2 <- test_result$Df[2]
+    
     if (is.na(p_value)) return("Tidak dapat mengambil P-value.")
-    if (p_value > 0.05) paste0("Kesimpulan: P-value (", round(p_value, 4), ") > 0.05, maka varian antar kelompok homogen.") else paste0("Kesimpulan: P-value (", round(p_value, 4), ") <= 0.05, maka varian antar kelompok tidak homogen.")
+    
+    # Interpretasi berdasarkan p-value
+    if (p_value > 0.05) {
+      paste0("HASIL UJI HOMOGENITAS VARIAN (Levene's Test):\n",
+             "Statistik F = ", round(f_value, 4), "\n",
+             "Derajat bebas = ", df1, ", ", df2, "\n",
+             "P-value = ", round(p_value, 4), "\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") > α (0.05), maka H₀ diterima.\n",
+             "KESIMPULAN: Varian antar kelompok adalah homogen (sama) pada tingkat signifikansi 5%.")
+    } else {
+      paste0("HASIL UJI HOMOGENITAS VARIAN (Levene's Test):\n",
+             "Statistik F = ", round(f_value, 4), "\n",
+             "Derajat bebas = ", df1, ", ", df2, "\n",
+             "P-value = ", round(p_value, 4), "\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") ≤ α (0.05), maka H₀ ditolak.\n",
+             "KESIMPULAN: Varian antar kelompok tidak homogen (berbeda) pada tingkat signifikansi 5%.")
+    }
   })
   
   
@@ -892,8 +1008,33 @@ server <- function(input, output, session) {
   })
   
   output$var1_test_interpretation <- renderText({
-    p_value <- var1_test_output()$p.value
-    if (p_value > 0.05) paste0("Kesimpulan: Varians sampel tidak berbeda signifikan dari nilai hipotesis (", input$var1_sigma_sq, ").") else paste0("Kesimpulan: Varians sampel berbeda signifikan dari nilai hipotesis (", input$var1_sigma_sq, ").")
+    test_result <- var1_test_output()
+    p_value <- test_result$p.value
+    chi_sq <- test_result$statistic
+    df <- test_result$parameters
+    sample_var <- test_result$estimate
+    
+    if (p_value > 0.05) {
+      paste0("HASIL UJI VARIANS SATU SAMPEL (Chi-Square Test):\n",
+             "Statistik χ² = ", round(chi_sq, 4), "\n",
+             "Derajat bebas = ", df, "\n",
+             "P-value = ", round(p_value, 4), "\n",
+             "Varians sampel = ", round(sample_var, 4), "\n",
+             "Varians hipotesis = ", input$var1_sigma_sq, "\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") > α (0.05), maka H₀ diterima.\n",
+             "KESIMPULAN: Varians sampel tidak berbeda signifikan dari nilai hipotesis pada tingkat signifikansi 5%.")
+    } else {
+      paste0("HASIL UJI VARIANS SATU SAMPEL (Chi-Square Test):\n",
+             "Statistik χ² = ", round(chi_sq, 4), "\n",
+             "Derajat bebas = ", df, "\n",
+             "P-value = ", round(p_value, 4), "\n",
+             "Varians sampel = ", round(sample_var, 4), "\n",
+             "Varians hipotesis = ", input$var1_sigma_sq, "\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") ≤ α (0.05), maka H₀ ditolak.\n",
+             "KESIMPULAN: Varians sampel berbeda signifikan dari nilai hipotesis pada tingkat signifikansi 5%.")
+    }
   })
   
   output$var2_var_selector <- renderUI({
@@ -928,8 +1069,32 @@ server <- function(input, output, session) {
   })
   
   output$var2_test_interpretation <- renderText({
-    p_value <- var2_test_output()$p.value
-    if (p_value > 0.05) "Kesimpulan: Tidak ada perbedaan varians yang signifikan antara kedua kelompok (varian homogen)." else "Kesimpulan: Terdapat perbedaan varians yang signifikan antara kedua kelompok (varian tidak homogen)."
+    test_result <- var2_test_output()
+    p_value <- test_result$p.value
+    f_stat <- test_result$statistic
+    df1 <- test_result$parameter[1]
+    df2 <- test_result$parameter[2]
+    ratio <- test_result$estimate
+    
+    if (p_value > 0.05) {
+      paste0("HASIL UJI VARIANS DUA SAMPEL (F-Test):\n",
+             "Statistik F = ", round(f_stat, 4), "\n",
+             "Derajat bebas = ", df1, ", ", df2, "\n",
+             "P-value = ", round(p_value, 4), "\n",
+             "Rasio varians = ", round(ratio, 4), "\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") > α (0.05), maka H₀ diterima.\n",
+             "KESIMPULAN: Tidak ada perbedaan varians yang signifikan antara kedua kelompok (varian homogen) pada tingkat signifikansi 5%.")
+    } else {
+      paste0("HASIL UJI VARIANS DUA SAMPEL (F-Test):\n",
+             "Statistik F = ", round(f_stat, 4), "\n",
+             "Derajat bebas = ", df1, ", ", df2, "\n",
+             "P-value = ", round(p_value, 4), "\n",
+             "Rasio varians = ", round(ratio, 4), "\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") ≤ α (0.05), maka H₀ ditolak.\n",
+             "KESIMPULAN: Terdapat perbedaan varians yang signifikan antara kedua kelompok (varian tidak homogen) pada tingkat signifikansi 5%.")
+    }
   })
   
   
@@ -1001,11 +1166,35 @@ server <- function(input, output, session) {
   
   output$prop1_test_interpretation <- renderText({
     validate(need(!is.null(prop_data()), ""))
-    p_value <- prop1_test_output()$p.value
+    test_result <- prop1_test_output()
+    p_value <- test_result$p.value
+    chi_sq <- test_result$statistic
+    df <- test_result$parameter
+    sample_prop <- test_result$estimate
+    conf_int <- test_result$conf.int
+    
     if (p_value > 0.05) {
-      paste0("Kesimpulan: Proporsi sampel tidak berbeda signifikan dari proporsi hipotesis (", input$prop1_p_hipotesis, ").")
+      paste0("HASIL UJI PROPORSI SATU SAMPEL:\n",
+             "Statistik χ² = ", round(chi_sq, 4), "\n",
+             "Derajat bebas = ", df, "\n",
+             "P-value = ", round(p_value, 4), "\n",
+             "Proporsi sampel = ", round(sample_prop, 4), " (", round(sample_prop*100, 1), "%)\n",
+             "Proporsi hipotesis = ", input$prop1_p_hipotesis, " (", round(input$prop1_p_hipotesis*100, 1), "%)\n",
+             "Interval kepercayaan 95% = [", round(conf_int[1], 4), ", ", round(conf_int[2], 4), "]\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") > α (0.05), maka H₀ diterima.\n",
+             "KESIMPULAN: Proporsi sampel tidak berbeda signifikan dari proporsi hipotesis pada tingkat signifikansi 5%.")
     } else {
-      paste0("Kesimpulan: Proporsi sampel berbeda signifikan dari proporsi hipotesis (", input$prop1_p_hipotesis, ").")
+      paste0("HASIL UJI PROPORSI SATU SAMPEL:\n",
+             "Statistik χ² = ", round(chi_sq, 4), "\n",
+             "Derajat bebas = ", df, "\n",
+             "P-value = ", round(p_value, 4), "\n",
+             "Proporsi sampel = ", round(sample_prop, 4), " (", round(sample_prop*100, 1), "%)\n",
+             "Proporsi hipotesis = ", input$prop1_p_hipotesis, " (", round(input$prop1_p_hipotesis*100, 1), "%)\n",
+             "Interval kepercayaan 95% = [", round(conf_int[1], 4), ", ", round(conf_int[2], 4), "]\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") ≤ α (0.05), maka H₀ ditolak.\n",
+             "KESIMPULAN: Proporsi sampel berbeda signifikan dari proporsi hipotesis pada tingkat signifikansi 5%.")
     }
   })
   
@@ -1057,11 +1246,35 @@ server <- function(input, output, session) {
   
     output$prop2_test_interpretation <- renderText({
     validate(need(!is.null(prop_data()), ""))
-    p_value <- prop2_test_output()$p.value
+    test_result <- prop2_test_output()
+    p_value <- test_result$p.value
+    chi_sq <- test_result$statistic
+    df <- test_result$parameter
+    prop1 <- test_result$estimate[1]
+    prop2 <- test_result$estimate[2]
+    
     if (p_value > 0.05) {
-      "Kesimpulan: Tidak ada perbedaan proporsi yang signifikan antara kedua kelompok."
+      paste0("HASIL UJI PROPORSI DUA SAMPEL:\n",
+             "Statistik χ² = ", round(chi_sq, 4), "\n",
+             "Derajat bebas = ", df, "\n",
+             "P-value = ", round(p_value, 4), "\n",
+             "Proporsi ", input$prop2_group1, " = ", round(prop1, 4), " (", round(prop1*100, 1), "%)\n",
+             "Proporsi ", input$prop2_group2, " = ", round(prop2, 4), " (", round(prop2*100, 1), "%)\n",
+             "Selisih proporsi = ", round(abs(prop1 - prop2), 4), "\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") > α (0.05), maka H₀ diterima.\n",
+             "KESIMPULAN: Tidak ada perbedaan proporsi yang signifikan antara kedua kelompok pada tingkat signifikansi 5%.")
     } else {
-      "Kesimpulan: Terdapat perbedaan proporsi yang signifikan antara kedua kelompok."
+      paste0("HASIL UJI PROPORSI DUA SAMPEL:\n",
+             "Statistik χ² = ", round(chi_sq, 4), "\n",
+             "Derajat bebas = ", df, "\n",
+             "P-value = ", round(p_value, 4), "\n",
+             "Proporsi ", input$prop2_group1, " = ", round(prop1, 4), " (", round(prop1*100, 1), "%)\n",
+             "Proporsi ", input$prop2_group2, " = ", round(prop2, 4), " (", round(prop2*100, 1), "%)\n",
+             "Selisih proporsi = ", round(abs(prop1 - prop2), 4), "\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") ≤ α (0.05), maka H₀ ditolak.\n",
+             "KESIMPULAN: Terdapat perbedaan proporsi yang signifikan antara kedua kelompok pada tingkat signifikansi 5%.")
     }
   })
   
@@ -1118,11 +1331,29 @@ server <- function(input, output, session) {
   })
   
   output$anova1_interpretation <- renderText({
-    p_value <- summary(anova1_model())[[1]][["Pr(>F)"]][1]
+    anova_summary <- summary(anova1_model())[[1]]
+    p_value <- anova_summary[["Pr(>F)"]][1]
+    f_value <- anova_summary[["F value"]][1]
+    df1 <- anova_summary[["Df"]][1]
+    df2 <- anova_summary[["Df"]][2]
+    
     if (p_value < 0.05) {
-      "Hasil ANOVA signifikan (p < 0.05), menunjukkan bahwa setidaknya ada satu kelompok yang rata-ratanya berbeda secara signifikan dari yang lain. Lihat tabel Post-Hoc untuk melihat pasangan kelompok mana yang berbeda."
+      paste0("HASIL ANALISIS VARIANS (ANOVA):\n",
+             "Statistik F = ", round(f_value, 4), "\n",
+             "Derajat bebas = ", df1, ", ", df2, "\n",
+             "P-value = ", round(p_value, 4), "\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") < α (0.05), maka H₀ ditolak.\n",
+             "KESIMPULAN: Terdapat perbedaan rata-rata yang signifikan antar kelompok pada tingkat signifikansi 5%.\n\n",
+             "SARAN: Lihat tabel Post-Hoc Tukey HSD untuk mengetahui pasangan kelompok mana yang berbeda secara signifikan.")
     } else {
-      "Hasil ANOVA tidak signifikan (p >= 0.05), menunjukkan bahwa tidak ada perbedaan rata-rata yang signifikan antar kelompok."
+      paste0("HASIL ANALISIS VARIANS (ANOVA):\n",
+             "Statistik F = ", round(f_value, 4), "\n",
+             "Derajat bebas = ", df1, ", ", df2, "\n",
+             "P-value = ", round(p_value, 4), "\n\n",
+             "INTERPRETASI:\n",
+             "Karena P-value (", round(p_value, 4), ") ≥ α (0.05), maka H₀ diterima.\n",
+             "KESIMPULAN: Tidak ada perbedaan rata-rata yang signifikan antar kelompok pada tingkat signifikansi 5%.")
     }
   })
   
@@ -1341,28 +1572,41 @@ server <- function(input, output, session) {
     
     sil_score <- results$silhouette_score
     var_explained <- results$between_ss / results$total_ss * 100
+    within_ss <- results$within_ss
+    between_ss <- results$between_ss
+    total_ss <- results$total_ss
     
     sil_interpretation <- if (sil_score > 0.7) {
-      "sangat baik"
+      "sangat baik (excellent)"
     } else if (sil_score > 0.5) {
-      "baik"
+      "baik (good)"
     } else if (sil_score > 0.25) {
-      "cukup"
+      "cukup (fair)"
     } else {
-      "kurang baik"
+      "kurang baik (poor)"
     }
     
     paste0(
-      "INTERPRETASI HASIL CLUSTERING:\n\n",
-      "1. Kualitas Clustering: Silhouette score sebesar ", round(sil_score, 3), 
+      "HASIL ANALISIS CLUSTERING K-MEANS:\n",
+      "Jumlah cluster = ", input$num_clusters, "\n",
+      "Jumlah observasi = ", nrow(results$data), "\n",
+      "Variabel yang digunakan = ", paste(results$variables_used, collapse = ", "), "\n\n",
+      "METRIK KUALITAS CLUSTERING:\n",
+      "Silhouette Score = ", round(sil_score, 4), "\n",
+      "Within Sum of Squares = ", round(within_ss, 2), "\n",
+      "Between Sum of Squares = ", round(between_ss, 2), "\n",
+      "Total Sum of Squares = ", round(total_ss, 2), "\n",
+      "Varians yang dijelaskan = ", round(var_explained, 2), "%\n\n",
+      "INTERPRETASI:\n",
+      "1. Kualitas Clustering: Silhouette score sebesar ", round(sil_score, 4), 
       " menunjukkan bahwa kualitas clustering ", sil_interpretation, ".\n\n",
       "2. Varians yang Dijelaskan: Model clustering menjelaskan ", 
-      round(var_explained, 1), "% dari total varians dalam data.\n\n",
-      "3. Rekomendasi: ",
+      round(var_explained, 2), "% dari total varians dalam data.\n\n",
+      "3. Evaluasi: ",
       if (sil_score > 0.5) {
-        "Hasil clustering dapat diandalkan untuk analisis lebih lanjut."
+        "Hasil clustering dapat diandalkan untuk analisis lebih lanjut dan interpretasi bisnis."
       } else {
-        "Pertimbangkan untuk mengubah jumlah cluster atau variabel yang digunakan."
+        "Pertimbangkan untuk mengubah jumlah cluster atau variabel yang digunakan untuk meningkatkan kualitas clustering."
       }
     )
   })
