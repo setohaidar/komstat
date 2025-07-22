@@ -3,7 +3,7 @@
 #----------------------------------------------------------------#
 
 # 1. PASTIKAN SEMUA LIBRARY INI SUDAH TERINSTALL
-# install.packages(c("shiny", "shinydashboard", "readxl", "DT", "officer", "flextable", "ggplot2", "dplyr", "sf", "leaflet", "car", "nortest", "EnvStats", "lmtest", "cluster", "factoextra", "corrplot", "pheatmap"))
+# install.packages(c("shiny", "shinydashboard", "readxl", "DT", "officer", "flextable", "ggplot2", "dplyr", "sf", "leaflet", "car", "nortest", "EnvStats", "lmtest", "cluster", "spdep"))
 
 library(shiny)
 library(shinydashboard)
@@ -20,9 +20,7 @@ library(nortest)
 library(EnvStats) 
 library(lmtest) # Ditambahkan untuk uji asumsi regresi
 library(cluster) # Untuk clustering analysis
-library(factoextra) # Untuk visualisasi clustering
-library(corrplot) # Untuk visualisasi korelasi
-library(pheatmap) # Untuk heatmap
+library(spdep) # Untuk analisis spasial dan Moran's I
 
 #================================================================#
 #                           UI (USER INTERFACE)                  #
@@ -392,97 +390,71 @@ ui <- dashboardPage(
               )
       ),
       
-      # --- TAB ANALISIS CLUSTERING --- #
+      # --- TAB ANALISIS CLUSTERING SEDERHANA --- #
       tabItem(tabName = "clustering",
               fluidRow(
                 box(
-                  title = "Pengaturan Analisis Clustering", width = 4, solidHeader = TRUE, status = "primary",
-                  h4("Persiapan Data"),
-                  uiOutput("cluster_var_selector"),
-                  helpText("Pilih variabel numerik untuk analisis clustering. Tahan Ctrl/Cmd untuk memilih beberapa variabel."),
+                  title = "Pengaturan Analisis", width = 4, solidHeader = TRUE, status = "primary",
+                  h4("1. Pilih Variabel"),
+                  uiOutput("cluster_var_selector_simple"),
+                  helpText("Pilih satu variabel untuk analisis clustering dan autokorelasi spasial."),
                   
                   hr(),
-                  h4("Matriks Penimbang Jarak"),
-                  selectInput("distance_method", "Metode Perhitungan Jarak:",
-                              choices = c("Euclidean" = "euclidean",
-                                        "Manhattan" = "manhattan", 
-                                        "Maximum" = "maximum",
-                                        "Canberra" = "canberra",
-                                        "Minkowski" = "minkowski"),
-                              selected = "euclidean"),
+                  h4("2. Matriks Pembobot Jarak"),
+                  selectInput("weight_method", "Metode Pembobot:",
+                              choices = c("Inverse Distance (1/d)" = "inverse",
+                                        "Inverse Distance Squared (1/d²)" = "inverse_squared",
+                                        "Exponential Decay" = "exponential"),
+                              selected = "inverse"),
                   
                   conditionalPanel(
-                    condition = "input.distance_method == 'minkowski'",
-                    numericInput("minkowski_p", "Parameter p untuk Minkowski:", value = 2, min = 1, step = 0.5)
+                    condition = "input.weight_method == 'exponential'",
+                    numericInput("decay_param", "Parameter Decay (α):", value = 0.1, min = 0.01, max = 1, step = 0.01)
                   ),
                   
                   hr(),
-                  h4("Metode Clustering"),
-                  selectInput("cluster_method", "Pilih Metode Clustering:",
-                              choices = c("K-Means" = "kmeans",
-                                        "Hierarchical (Ward)" = "ward",
-                                        "Hierarchical (Complete)" = "complete",
-                                        "Hierarchical (Average)" = "average"),
-                              selected = "kmeans"),
-                  
-                  conditionalPanel(
-                    condition = "input.cluster_method == 'kmeans'",
-                    numericInput("n_clusters_kmeans", "Jumlah Cluster (K):", value = 3, min = 2, max = 10, step = 1)
-                  ),
-                  
-                  conditionalPanel(
-                    condition = "input.cluster_method != 'kmeans'",
-                    numericInput("n_clusters_hier", "Jumlah Cluster:", value = 3, min = 2, max = 10, step = 1)
-                  ),
+                  h4("3. K-Means Clustering"),
+                  numericInput("k_clusters", "Jumlah Cluster (K):", value = 3, min = 2, max = 8, step = 1),
                   
                   hr(),
-                  actionButton("run_clustering", "Jalankan Analisis Clustering", icon = icon("play-circle"), class = "btn-primary"),
+                  actionButton("run_simple_analysis", "Jalankan Analisis", icon = icon("play-circle"), class = "btn-primary"),
                   
                   hr(),
-                  h4("Unduh Hasil"),
-                  downloadButton("download_clustering", "Unduh Hasil Clustering (Word)", class = "btn-success")
+                  downloadButton("download_simple_results", "Unduh Hasil (Word)", class = "btn-success")
                 ),
                 
                 box(
-                  title = "Ringkasan Hasil Clustering", width = 8, solidHeader = TRUE, status = "primary",
-                  verbatimTextOutput("cluster_summary"),
-                  hr(),
-                  h4("Tabel Hasil Clustering"),
-                  DTOutput("cluster_results_table")
+                  title = "Hasil Analisis", width = 8, solidHeader = TRUE, status = "primary",
+                  tabsetPanel(
+                    tabPanel("Ringkasan", 
+                             verbatimTextOutput("simple_analysis_summary")
+                    ),
+                    tabPanel("Tabel Hasil", 
+                             DTOutput("simple_results_table")
+                    )
+                  )
                 )
               ),
               
               fluidRow(
                 box(
-                  title = "Matriks Jarak", width = 6, solidHeader = TRUE, status = "info", collapsible = TRUE,
-                  p("Matriks jarak menunjukkan tingkat kemiripan antar observasi."),
-                  plotOutput("distance_matrix_plot", height = "400px")
+                  title = "Indeks Moran I (Autokorelasi Spasial)", width = 6, solidHeader = TRUE, status = "info",
+                  verbatimTextOutput("moran_i_result"),
+                  hr(),
+                  h5("Interpretasi:", style = "font-weight:bold;"),
+                  textOutput("moran_i_interpretation")
                 ),
                 
                 box(
-                  title = "Visualisasi Clustering", width = 6, solidHeader = TRUE, status = "info", collapsible = TRUE,
-                  plotOutput("cluster_visualization", height = "400px")
+                  title = "Visualisasi K-Means Clustering", width = 6, solidHeader = TRUE, status = "info",
+                  plotOutput("simple_cluster_plot", height = "400px")
                 )
               ),
               
               fluidRow(
                 box(
-                  title = "Dendrogram (Untuk Hierarchical Clustering)", width = 6, solidHeader = TRUE, status = "success", collapsible = TRUE,
-                  plotOutput("dendrogram_plot", height = "500px")
-                ),
-                
-                box(
-                  title = "Silhouette Analysis", width = 6, solidHeader = TRUE, status = "success", collapsible = TRUE,
-                  p("Silhouette analysis mengevaluasi kualitas clustering. Nilai mendekati 1 menunjukkan clustering yang baik."),
-                  plotOutput("silhouette_plot", height = "400px"),
-                  verbatimTextOutput("silhouette_summary")
-                )
-              ),
-              
-              fluidRow(
-                box(
-                  title = "Statistik Deskriptif per Cluster", width = 12, solidHeader = TRUE, status = "warning", collapsible = TRUE,
-                  DTOutput("cluster_descriptive_stats")
+                  title = "Peta Hasil Clustering", width = 12, solidHeader = TRUE, status = "success",
+                  plotOutput("cluster_map", height = "500px")
                 )
               )
       ),
@@ -1345,381 +1317,303 @@ server <- function(input, output, session) {
     }
   )
   
-  # --- LOGIKA UNTUK ANALISIS CLUSTERING --- #
+  # --- LOGIKA UNTUK ANALISIS CLUSTERING SEDERHANA --- #
   
-  # Selector untuk variabel clustering
-  output$cluster_var_selector <- renderUI({
+  # Selector untuk variabel clustering (satu variabel saja)
+  output$cluster_var_selector_simple <- renderUI({
     df <- data_sosial()
     kolom_numerik <- names(df)[sapply(df, is.numeric)]
     kolom_numerik <- setdiff(kolom_numerik, nama_kolom_kode)
-    selectInput("cluster_variables", "Pilih Variabel untuk Clustering:",
-                choices = kolom_numerik, multiple = TRUE, 
-                selected = kolom_numerik[1:min(3, length(kolom_numerik))])
+    selectInput("cluster_variable", "Pilih Variabel:",
+                choices = kolom_numerik, selected = kolom_numerik[1])
   })
   
-  # Reactive untuk data clustering yang sudah diproses
-  cluster_data_processed <- reactive({
-    req(input$cluster_variables)
-    df <- data_sosial()
+  # Reactive untuk matriks pembobot berdasarkan jarak spasial
+  spatial_weights <- reactive({
+    req(geojson_data())
     
-    # Ambil data yang dipilih
-    cluster_data <- df[, c(nama_kolom_kabupaten, nama_kolom_kode, input$cluster_variables), drop = FALSE]
+    # Dapatkan centroid dari setiap polygon
+    geom_data <- geojson_data()
+    centroids <- st_centroid(geom_data)
+    coords <- st_coordinates(centroids)
     
-    # Hapus baris dengan missing values
-    cluster_data_clean <- cluster_data[complete.cases(cluster_data), ]
+    # Hitung matriks jarak euclidean
+    dist_matrix <- as.matrix(dist(coords))
     
-    # Standardisasi data numerik (z-score normalization)
-    numeric_cols <- input$cluster_variables
-    cluster_data_clean[numeric_cols] <- scale(cluster_data_clean[numeric_cols])
+    # Buat matriks pembobot berdasarkan jarak
+    n <- nrow(dist_matrix)
+    weight_matrix <- matrix(0, n, n)
     
-    return(cluster_data_clean)
-  })
-  
-  # Reactive untuk matriks jarak
-  distance_matrix_reactive <- reactive({
-    req(input$distance_method, cluster_data_processed())
-    
-    cluster_data <- cluster_data_processed()
-    numeric_data <- cluster_data[, input$cluster_variables, drop = FALSE]
-    
-    # Hitung matriks jarak
-    if (input$distance_method == "minkowski") {
-      req(input$minkowski_p)
-      dist_matrix <- dist(numeric_data, method = "minkowski", p = input$minkowski_p)
-    } else {
-      dist_matrix <- dist(numeric_data, method = input$distance_method)
-    }
-    
-    return(dist_matrix)
-  })
-  
-  # Reactive untuk hasil clustering
-  clustering_results <- eventReactive(input$run_clustering, {
-    req(input$cluster_method, cluster_data_processed(), distance_matrix_reactive())
-    
-    cluster_data <- cluster_data_processed()
-    dist_matrix <- distance_matrix_reactive()
-    numeric_data <- cluster_data[, input$cluster_variables, drop = FALSE]
-    
-    if (input$cluster_method == "kmeans") {
-      req(input$n_clusters_kmeans)
-      set.seed(123) # Untuk reproducibility
-      kmeans_result <- kmeans(numeric_data, centers = input$n_clusters_kmeans, nstart = 25)
-      cluster_assignments <- kmeans_result$cluster
-      method_info <- list(method = "K-Means", centers = kmeans_result$centers, 
-                         withinss = kmeans_result$withinss, betweenss = kmeans_result$betweenss,
-                         totss = kmeans_result$totss)
-    } else {
-      # Hierarchical clustering
-      if (input$cluster_method == "ward") {
-        hc_result <- hclust(dist_matrix, method = "ward.D2")
-      } else {
-        hc_result <- hclust(dist_matrix, method = input$cluster_method)
+    for(i in 1:n) {
+      for(j in 1:n) {
+        if(i != j) {
+          d <- dist_matrix[i, j]
+          if(d > 0) {
+            if(input$weight_method == "inverse") {
+              weight_matrix[i, j] <- 1/d
+            } else if(input$weight_method == "inverse_squared") {
+              weight_matrix[i, j] <- 1/(d^2)
+            } else if(input$weight_method == "exponential") {
+              req(input$decay_param)
+              weight_matrix[i, j] <- exp(-input$decay_param * d)
+            }
+          }
+        }
       }
-      
-      req(input$n_clusters_hier)
-      cluster_assignments <- cutree(hc_result, k = input$n_clusters_hier)
-      method_info <- list(method = paste("Hierarchical", input$cluster_method), 
-                         hclust_obj = hc_result)
     }
     
-    # Gabungkan hasil dengan data asli
-    result_data <- cluster_data
-    result_data$Cluster <- as.factor(cluster_assignments)
+    # Normalisasi baris (row-standardized)
+    row_sums <- rowSums(weight_matrix)
+    for(i in 1:n) {
+      if(row_sums[i] > 0) {
+        weight_matrix[i, ] <- weight_matrix[i, ] / row_sums[i]
+      }
+    }
     
-    return(list(data = result_data, method_info = method_info, 
-               distance_matrix = dist_matrix, numeric_data = numeric_data))
+    return(weight_matrix)
   })
   
-  # Output ringkasan clustering
-  output$cluster_summary <- renderPrint({
-    results <- clustering_results()
+  # Reactive untuk hasil analisis
+  simple_analysis_results <- eventReactive(input$run_simple_analysis, {
+    req(input$cluster_variable, input$k_clusters)
+    
+    # Data sosial
+    df <- data_sosial()
+    var_data <- df[[input$cluster_variable]]
+    
+    # Hapus missing values
+    complete_idx <- !is.na(var_data)
+    clean_data <- var_data[complete_idx]
+    clean_df <- df[complete_idx, ]
+    
+    # Standardisasi data untuk K-Means
+    scaled_data <- scale(clean_data)[, 1]
+    
+    # K-Means Clustering
+    set.seed(123)
+    kmeans_result <- kmeans(scaled_data, centers = input$k_clusters, nstart = 25)
+    
+    # Gabungkan hasil
+    result_df <- clean_df
+    result_df$Cluster <- as.factor(kmeans_result$cluster)
+    result_df$Scaled_Value <- scaled_data
+    
+    # Hitung Moran's I jika ada data spasial
+    moran_result <- NULL
+    if(nrow(result_df) > 5) {
+      tryCatch({
+        # Buat spatial weights list dari matriks
+        weight_mat <- spatial_weights()[complete_idx, complete_idx]
+        
+        # Konversi ke listw object
+        nb_list <- mat2listw(weight_mat, style = "W", zero.policy = TRUE)
+        
+        # Hitung Moran's I
+        moran_result <- moran.test(clean_data, nb_list, zero.policy = TRUE)
+      }, error = function(e) {
+        moran_result <<- NULL
+      })
+    }
+    
+    return(list(
+      data = result_df,
+      kmeans = kmeans_result,
+      moran = moran_result,
+      variable = input$cluster_variable,
+      weight_method = input$weight_method,
+      k = input$k_clusters
+    ))
+  })
+  
+  # Output ringkasan analisis
+  output$simple_analysis_summary <- renderPrint({
+    results <- simple_analysis_results()
     req(results)
     
-    cat("=== RINGKASAN ANALISIS CLUSTERING ===\n\n")
-    cat("Metode:", results$method_info$method, "\n")
-    cat("Metode Jarak:", input$distance_method, "\n")
-    if (input$distance_method == "minkowski") {
-      cat("Parameter p:", input$minkowski_p, "\n")
-    }
-    cat("Jumlah Observasi:", nrow(results$data), "\n")
-    cat("Jumlah Variabel:", length(input$cluster_variables), "\n")
-    cat("Variabel yang Digunakan:", paste(input$cluster_variables, collapse = ", "), "\n")
-    cat("Jumlah Cluster:", length(unique(results$data$Cluster)), "\n\n")
+    cat("=== ANALISIS CLUSTERING DAN AUTOKORELASI SPASIAL ===\n\n")
+    cat("Variabel Analisis:", results$variable, "\n")
+    cat("Metode Pembobot:", switch(results$weight_method,
+                                  "inverse" = "Inverse Distance (1/d)",
+                                  "inverse_squared" = "Inverse Distance Squared (1/d²)",
+                                  "exponential" = "Exponential Decay"), "\n")
+    cat("Jumlah Cluster (K):", results$k, "\n")
+    cat("Jumlah Observasi:", nrow(results$data), "\n\n")
     
     # Distribusi cluster
-    cat("Distribusi per Cluster:\n")
-    print(table(results$data$Cluster))
+    cat("DISTRIBUSI CLUSTER:\n")
+    cluster_table <- table(results$data$Cluster)
+    for(i in names(cluster_table)) {
+      cat("Cluster", i, ":", cluster_table[i], "kabupaten/kota\n")
+    }
     
-    # Informasi tambahan untuk K-Means
-    if (results$method_info$method == "K-Means") {
-      cat("\nWithin Sum of Squares per Cluster:\n")
-      print(results$method_info$withinss)
-      cat("\nBetween Sum of Squares:", results$method_info$betweenss, "\n")
-      cat("Total Sum of Squares:", results$method_info$totss, "\n")
-      cat("Ratio BSS/TSS:", round(results$method_info$betweenss/results$method_info$totss, 4), "\n")
+    cat("\nSTATISTIK K-MEANS:\n")
+    cat("Total Sum of Squares:", round(results$kmeans$totss, 2), "\n")
+    cat("Between Sum of Squares:", round(results$kmeans$betweenss, 2), "\n")
+    cat("Within Sum of Squares:", round(sum(results$kmeans$withinss), 2), "\n")
+    cat("BSS/TSS Ratio:", round(results$kmeans$betweenss/results$kmeans$totss, 4), "\n")
+    
+    # Rata-rata per cluster
+    cat("\nRATA-RATA NILAI PER CLUSTER:\n")
+    original_data <- results$data[[results$variable]]
+    for(i in 1:results$k) {
+      cluster_data <- original_data[results$data$Cluster == i]
+      cat("Cluster", i, "- Mean:", round(mean(cluster_data, na.rm = TRUE), 2), 
+          ", N:", length(cluster_data), "\n")
     }
   })
   
-  # Tabel hasil clustering
-  output$cluster_results_table <- renderDT({
-    results <- clustering_results()
+  # Tabel hasil
+  output$simple_results_table <- renderDT({
+    results <- simple_analysis_results()
     req(results)
     
     display_data <- results$data %>%
-      select(all_of(nama_kolom_kode), all_of(nama_kolom_kabupaten), Cluster, everything()) %>%
-      select(-all_of(input$cluster_variables)) # Hapus variabel yang sudah di-standardisasi
-    
-    # Tambahkan variabel asli (tidak di-standardisasi)
-    original_data <- data_sosial()[, input$cluster_variables, drop = FALSE]
-    display_data <- cbind(display_data, original_data)
+      select(all_of(nama_kolom_kode), all_of(nama_kolom_kabupaten), 
+             all_of(results$variable), Cluster) %>%
+      arrange(Cluster, desc(.data[[results$variable]]))
     
     datatable(display_data, 
-              options = list(pageLength = 10, scrollX = TRUE),
-              rownames = FALSE) %>%
-      formatRound(columns = input$cluster_variables, digits = 2)
-  })
-  
-  # Plot matriks jarak
-  output$distance_matrix_plot <- renderPlot({
-    req(distance_matrix_reactive())
-    
-    dist_matrix <- as.matrix(distance_matrix_reactive())
-    
-    # Buat heatmap matriks jarak
-    pheatmap(dist_matrix, 
-             color = colorRampPalette(c("blue", "white", "red"))(50),
-             main = paste("Matriks Jarak (", input$distance_method, ")", sep = ""),
-             show_rownames = FALSE, show_colnames = FALSE,
-             fontsize = 8)
-  })
-  
-  # Visualisasi clustering
-  output$cluster_visualization <- renderPlot({
-    results <- clustering_results()
-    req(results)
-    
-    if (length(input$cluster_variables) >= 2) {
-      # PCA untuk visualisasi jika lebih dari 2 variabel
-      if (length(input$cluster_variables) > 2) {
-        pca_result <- prcomp(results$numeric_data, scale. = FALSE) # Data sudah di-standardisasi
-        plot_data <- data.frame(
-          PC1 = pca_result$x[,1],
-          PC2 = pca_result$x[,2],
-          Cluster = results$data$Cluster
-        )
-        
-        ggplot(plot_data, aes(x = PC1, y = PC2, color = Cluster)) +
-          geom_point(size = 3, alpha = 0.7) +
-          stat_ellipse(type = "confidence", level = 0.95) +
-          labs(title = "Visualisasi Clustering (PCA)",
-               x = paste("PC1 (", round(summary(pca_result)$importance[2,1]*100, 1), "%)", sep=""),
-               y = paste("PC2 (", round(summary(pca_result)$importance[2,2]*100, 1), "%)", sep="")) +
-          theme_minimal() +
-          theme(plot.title = element_text(hjust = 0.5, face = "bold"))
-      } else {
-        # Scatter plot untuk 2 variabel
-        plot_data <- data.frame(
-          Var1 = results$numeric_data[,1],
-          Var2 = results$numeric_data[,2],
-          Cluster = results$data$Cluster
-        )
-        
-        ggplot(plot_data, aes(x = Var1, y = Var2, color = Cluster)) +
-          geom_point(size = 3, alpha = 0.7) +
-          stat_ellipse(type = "confidence", level = 0.95) +
-          labs(title = "Visualisasi Clustering",
-               x = input$cluster_variables[1],
-               y = input$cluster_variables[2]) +
-          theme_minimal() +
-          theme(plot.title = element_text(hjust = 0.5, face = "bold"))
-      }
-    } else {
-      # Plot untuk 1 variabel (histogram)
-      plot_data <- data.frame(
-        Value = results$numeric_data[,1],
-        Cluster = results$data$Cluster
-      )
-      
-      ggplot(plot_data, aes(x = Value, fill = Cluster)) +
-        geom_histogram(alpha = 0.7, bins = 20) +
-        facet_wrap(~Cluster, ncol = 1) +
-        labs(title = "Distribusi Clustering",
-             x = input$cluster_variables[1]) +
-        theme_minimal() +
-        theme(plot.title = element_text(hjust = 0.5, face = "bold"))
-    }
-  })
-  
-  # Dendrogram untuk hierarchical clustering
-  output$dendrogram_plot <- renderPlot({
-    results <- clustering_results()
-    req(results)
-    
-    if (results$method_info$method != "K-Means") {
-      hc_obj <- results$method_info$hclust_obj
-      plot(hc_obj, main = paste("Dendrogram (", results$method_info$method, ")", sep = ""),
-           xlab = "Observasi", ylab = "Jarak", cex = 0.8)
-      
-      # Tambahkan garis untuk cut
-      n_clusters <- if (input$cluster_method == "kmeans") input$n_clusters_kmeans else input$n_clusters_hier
-      abline(h = sort(hc_obj$height, decreasing = TRUE)[n_clusters-1], col = "red", lty = 2, lwd = 2)
-      text(x = 1, y = sort(hc_obj$height, decreasing = TRUE)[n_clusters-1], 
-           labels = paste("Cut untuk", n_clusters, "cluster"), pos = 3, col = "red")
-    } else {
-      plot.new()
-      text(0.5, 0.5, "Dendrogram hanya tersedia untuk Hierarchical Clustering", 
-           cex = 1.2, col = "gray")
-    }
-  })
-  
-  # Silhouette analysis
-  output$silhouette_plot <- renderPlot({
-    results <- clustering_results()
-    req(results)
-    
-    sil <- silhouette(as.numeric(results$data$Cluster), results$distance_matrix)
-    fviz_silhouette(sil) +
-      theme_minimal() +
-      labs(title = "Silhouette Analysis") +
-      theme(plot.title = element_text(hjust = 0.5, face = "bold"))
-  })
-  
-  output$silhouette_summary <- renderPrint({
-    results <- clustering_results()
-    req(results)
-    
-    sil <- silhouette(as.numeric(results$data$Cluster), results$distance_matrix)
-    cat("=== RINGKASAN SILHOUETTE ANALYSIS ===\n\n")
-    cat("Rata-rata Silhouette Width:", round(mean(sil[,3]), 4), "\n\n")
-    cat("Interpretasi:\n")
-    avg_sil <- mean(sil[,3])
-    if (avg_sil > 0.7) {
-      cat("- Clustering sangat baik (> 0.7)\n")
-    } else if (avg_sil > 0.5) {
-      cat("- Clustering cukup baik (0.5 - 0.7)\n")
-    } else if (avg_sil > 0.25) {
-      cat("- Clustering lemah (0.25 - 0.5)\n")
-    } else {
-      cat("- Clustering tidak baik (< 0.25)\n")
-    }
-    
-    cat("\nSilhouette Width per Cluster:\n")
-    sil_summary <- aggregate(sil[,3], by = list(Cluster = sil[,1]), FUN = mean)
-    names(sil_summary) <- c("Cluster", "Avg_Silhouette_Width")
-    print(sil_summary)
-  })
-  
-  # Statistik deskriptif per cluster
-  output$cluster_descriptive_stats <- renderDT({
-    results <- clustering_results()
-    req(results)
-    
-    # Gabungkan dengan data asli
-    original_data <- data_sosial()
-    cluster_with_original <- merge(results$data[, c(nama_kolom_kode, "Cluster")], 
-                                  original_data, by = nama_kolom_kode)
-    
-    # Hitung statistik deskriptif per cluster
-    stats_list <- list()
-    for (cluster_id in sort(unique(cluster_with_original$Cluster))) {
-      cluster_data <- cluster_with_original[cluster_with_original$Cluster == cluster_id, 
-                                          input$cluster_variables, drop = FALSE]
-      
-      stats <- data.frame(
-        Cluster = cluster_id,
-        Variabel = input$cluster_variables,
-        N = nrow(cluster_data),
-        Mean = round(sapply(cluster_data, mean, na.rm = TRUE), 2),
-        Median = round(sapply(cluster_data, median, na.rm = TRUE), 2),
-        SD = round(sapply(cluster_data, sd, na.rm = TRUE), 2),
-        Min = round(sapply(cluster_data, min, na.rm = TRUE), 2),
-        Max = round(sapply(cluster_data, max, na.rm = TRUE), 2)
-      )
-      
-      stats_list[[as.character(cluster_id)]] <- stats
-    }
-    
-    all_stats <- do.call(rbind, stats_list)
-    rownames(all_stats) <- NULL
-    
-    datatable(all_stats, 
               options = list(pageLength = 15, scrollX = TRUE),
               rownames = FALSE) %>%
-      formatRound(columns = c("Mean", "Median", "SD", "Min", "Max"), digits = 2)
+      formatRound(columns = results$variable, digits = 2)
   })
   
-  # Download handler untuk clustering
-  output$download_clustering <- downloadHandler(
-    filename = function() paste0("hasil_clustering_", Sys.Date(), ".docx"),
+  # Moran's I hasil dan interpretasi
+  output$moran_i_result <- renderPrint({
+    results <- simple_analysis_results()
+    req(results)
+    
+    if(!is.null(results$moran)) {
+      cat("=== UJI MORAN'S I ===\n\n")
+      cat("Moran's I Statistic:", round(results$moran$estimate[1], 4), "\n")
+      cat("Expected Value:", round(results$moran$estimate[2], 4), "\n")
+      cat("Variance:", round(results$moran$estimate[3], 6), "\n")
+      cat("Z-Score:", round(results$moran$statistic, 4), "\n")
+      cat("P-value:", round(results$moran$p.value, 6), "\n")
+    } else {
+      cat("Moran's I tidak dapat dihitung.\nKemungkinan penyebab: data spasial tidak lengkap atau jumlah observasi terlalu sedikit.")
+    }
+  })
+  
+  output$moran_i_interpretation <- renderText({
+    results <- simple_analysis_results()
+    req(results)
+    
+    if(!is.null(results$moran)) {
+      moran_i <- results$moran$estimate[1]
+      p_value <- results$moran$p.value
+      
+      if(p_value < 0.05) {
+        if(moran_i > 0) {
+          paste0("Terdapat autokorelasi spasial positif yang signifikan (Moran's I = ", 
+                round(moran_i, 4), ", p < 0.05). Kabupaten/kota dengan nilai tinggi cenderung bertetangga dengan yang bernilai tinggi, begitu juga sebaliknya.")
+        } else {
+          paste0("Terdapat autokorelasi spasial negatif yang signifikan (Moran's I = ", 
+                round(moran_i, 4), ", p < 0.05). Kabupaten/kota dengan nilai tinggi cenderung bertetangga dengan yang bernilai rendah.")
+        }
+      } else {
+        paste0("Tidak terdapat autokorelasi spasial yang signifikan (Moran's I = ", 
+              round(moran_i, 4), ", p = ", round(p_value, 4), "). Distribusi nilai bersifat acak secara spasial.")
+      }
+    } else {
+      "Interpretasi tidak dapat diberikan karena Moran's I tidak dapat dihitung."
+    }
+  })
+  
+  # Plot clustering sederhana
+  output$simple_cluster_plot <- renderPlot({
+    results <- simple_analysis_results()
+    req(results)
+    
+    # Histogram berdasarkan cluster
+    plot_data <- data.frame(
+      Value = results$data[[results$variable]],
+      Cluster = results$data$Cluster
+    )
+    
+    ggplot(plot_data, aes(x = Value, fill = Cluster)) +
+      geom_histogram(alpha = 0.7, bins = 20, position = "identity") +
+      facet_wrap(~paste("Cluster", Cluster), scales = "free_y") +
+      labs(title = paste("Distribusi", gsub("_", " ", results$variable), "per Cluster"),
+           x = gsub("_", " ", results$variable),
+           y = "Frekuensi") +
+      theme_minimal() +
+      theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+            legend.position = "none")
+  })
+  
+  # Peta hasil clustering
+  output$cluster_map <- renderPlot({
+    results <- simple_analysis_results()
+    req(results, geojson_data())
+    
+    # Gabungkan hasil dengan data spasial
+    geom_data <- geojson_data()
+    map_data <- merge(geom_data, 
+                     results$data[, c(nama_kolom_kode, "Cluster")], 
+                     by = nama_kolom_kode, all.x = TRUE)
+    
+    ggplot(map_data) +
+      geom_sf(aes(fill = Cluster), color = "white", size = 0.3) +
+      scale_fill_discrete(name = "Cluster", na.value = "grey90") +
+      labs(title = paste("Peta Hasil K-Means Clustering\nVariabel:", gsub("_", " ", results$variable))) +
+      theme_void() +
+      theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+            legend.position = "bottom")
+  })
+  
+  # Download handler
+  output$download_simple_results <- downloadHandler(
+    filename = function() paste0("hasil_clustering_sederhana_", Sys.Date(), ".docx"),
     content = function(file) {
-      results <- clustering_results()
+      results <- simple_analysis_results()
       req(results)
       
       doc <- read_docx() %>% 
-        body_add_par("Hasil Analisis Clustering dengan Matriks Penimbang Jarak", style = "heading 1")
+        body_add_par("Hasil Analisis Clustering dengan Matriks Pembobot Jarak", style = "heading 1")
       
       # Informasi umum
       doc %>% body_add_par("Informasi Umum", style = "heading 2")
-      doc %>% body_add_par(paste("Metode Clustering:", results$method_info$method))
-      doc %>% body_add_par(paste("Metode Perhitungan Jarak:", input$distance_method))
-      if (input$distance_method == "minkowski") {
-        doc %>% body_add_par(paste("Parameter p (Minkowski):", input$minkowski_p))
-      }
+      doc %>% body_add_par(paste("Variabel Analisis:", results$variable))
+      doc %>% body_add_par(paste("Metode Pembobot:", switch(results$weight_method,
+                                                           "inverse" = "Inverse Distance (1/d)",
+                                                           "inverse_squared" = "Inverse Distance Squared (1/d²)",
+                                                           "exponential" = "Exponential Decay")))
+      doc %>% body_add_par(paste("Jumlah Cluster (K):", results$k))
       doc %>% body_add_par(paste("Jumlah Observasi:", nrow(results$data)))
-      doc %>% body_add_par(paste("Jumlah Cluster:", length(unique(results$data$Cluster))))
-      doc %>% body_add_par(paste("Variabel yang Digunakan:", paste(input$cluster_variables, collapse = ", ")))
       
-      # Distribusi cluster
-      doc %>% body_add_par("Distribusi per Cluster", style = "heading 2")
+      # Hasil K-Means
+      doc %>% body_add_par("Hasil K-Means Clustering", style = "heading 2")
       cluster_dist <- as.data.frame(table(results$data$Cluster))
-      names(cluster_dist) <- c("Cluster", "Jumlah_Observasi")
+      names(cluster_dist) <- c("Cluster", "Jumlah_Kabupaten_Kota")
       doc %>% body_add_flextable(flextable(cluster_dist) %>% autofit())
       
-      # Hasil clustering
+      doc %>% body_add_par(paste("BSS/TSS Ratio:", round(results$kmeans$betweenss/results$kmeans$totss, 4)))
+      
+      # Moran's I
+      doc %>% body_add_par("Hasil Uji Moran's I", style = "heading 2")
+      if(!is.null(results$moran)) {
+        moran_table <- data.frame(
+          Statistik = c("Moran's I", "Expected Value", "Z-Score", "P-value"),
+          Nilai = c(round(results$moran$estimate[1], 4),
+                   round(results$moran$estimate[2], 4),
+                   round(results$moran$statistic, 4),
+                   round(results$moran$p.value, 6))
+        )
+        doc %>% body_add_flextable(flextable(moran_table) %>% autofit())
+        doc %>% body_add_par("Interpretasi:", style = "heading 3")
+        doc %>% body_add_par(output$moran_i_interpretation())
+      } else {
+        doc %>% body_add_par("Moran's I tidak dapat dihitung karena keterbatasan data spasial.")
+      }
+      
+      # Tabel hasil
       doc %>% body_add_par("Tabel Hasil Clustering", style = "heading 2")
       display_data <- results$data %>%
-        select(all_of(nama_kolom_kode), all_of(nama_kolom_kabupaten), Cluster)
+        select(all_of(nama_kolom_kode), all_of(nama_kolom_kabupaten), 
+               all_of(results$variable), Cluster) %>%
+        arrange(Cluster)
       doc %>% body_add_flextable(flextable(display_data) %>% autofit())
-      
-      # Silhouette analysis
-      sil <- silhouette(as.numeric(results$data$Cluster), results$distance_matrix)
-      doc %>% body_add_par("Evaluasi Kualitas Clustering (Silhouette Analysis)", style = "heading 2")
-      doc %>% body_add_par(paste("Rata-rata Silhouette Width:", round(mean(sil[,3]), 4)))
-      
-      avg_sil <- mean(sil[,3])
-      interpretation <- if (avg_sil > 0.7) {
-        "Clustering sangat baik (> 0.7)"
-      } else if (avg_sil > 0.5) {
-        "Clustering cukup baik (0.5 - 0.7)"
-      } else if (avg_sil > 0.25) {
-        "Clustering lemah (0.25 - 0.5)"
-      } else {
-        "Clustering tidak baik (< 0.25)"
-      }
-      doc %>% body_add_par(paste("Interpretasi:", interpretation))
-      
-      # Statistik deskriptif
-      doc %>% body_add_par("Statistik Deskriptif per Cluster", style = "heading 2")
-      original_data <- data_sosial()
-      cluster_with_original <- merge(results$data[, c(nama_kolom_kode, "Cluster")], 
-                                    original_data, by = nama_kolom_kode)
-      
-      for (cluster_id in sort(unique(cluster_with_original$Cluster))) {
-        doc %>% body_add_par(paste("Cluster", cluster_id), style = "heading 3")
-        cluster_data <- cluster_with_original[cluster_with_original$Cluster == cluster_id, 
-                                            input$cluster_variables, drop = FALSE]
-        
-        stats_table <- data.frame(
-          Variabel = input$cluster_variables,
-          N = nrow(cluster_data),
-          Mean = round(sapply(cluster_data, mean, na.rm = TRUE), 2),
-          Median = round(sapply(cluster_data, median, na.rm = TRUE), 2),
-          SD = round(sapply(cluster_data, sd, na.rm = TRUE), 2)
-        )
-        
-        doc %>% body_add_flextable(flextable(stats_table) %>% autofit())
-      }
       
       print(doc, target = file)
     }
