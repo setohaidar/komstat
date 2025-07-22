@@ -317,6 +317,37 @@ ui <- dashboardPage(
                   )
                 )
               ),
+              
+              fluidRow(
+                box(
+                  title = "ANOVA Dua Arah (Two-Way ANOVA)", width = 12, solidHeader = TRUE, status = "success", collapsible = TRUE,
+                  fluidRow(
+                    column(width = 4,
+                           h4("Pengaturan"),
+                           p("Uji ini menganalisis pengaruh dua faktor independen terhadap variabel dependen."),
+                           uiOutput("anova2_var_selector"),
+                           uiOutput("anova2_factor1_selector"),
+                           uiOutput("anova2_factor2_selector"),
+                           br(),
+                           checkboxInput("anova2_interaction", "Sertakan Interaksi Antar Faktor", value = TRUE),
+                           p(em("Catatan: Faktor harus berupa variabel kategorikal dengan minimal 2 level."))
+                    ),
+                    column(width = 8,
+                           h4("Hasil Tabel ANOVA Dua Arah"),
+                           uiOutput("anova2_result_table"),
+                           hr(),
+                           h4("Uji Lanjutan (Post-Hoc)"),
+                           p("Uji lanjutan dilakukan untuk faktor yang signifikan:"),
+                           uiOutput("anova2_posthoc_factor1"),
+                           uiOutput("anova2_posthoc_factor2"),
+                           hr(),
+                           h5("Interpretasi:", style = "font-weight:bold;"),
+                           textOutput("anova2_interpretation")
+                    )
+                  )
+                )
+              ),
+              
               fluidRow(
                 box(title = "Unduh Hasil", width = 12,
                     downloadButton("download_anova", "Unduh Hasil ANOVA (Word)")
@@ -1128,11 +1159,235 @@ server <- function(input, output, session) {
     }
   })
   
+  # --- LOGIKA UNTUK ANOVA DUA ARAH --- #
+  
+  # Selector untuk variabel dependen ANOVA 2 arah
+  output$anova2_var_selector <- renderUI({
+    df <- data_sosial()
+    kolom_numerik <- names(df)[sapply(df, is.numeric)]
+    kolom_numerik <- setdiff(kolom_numerik, nama_kolom_kode)
+    selectInput("anova2_var", "Pilih Variabel Dependen (Numerik):", choices = kolom_numerik)
+  })
+  
+  # Selector untuk faktor 1
+  output$anova2_factor1_selector <- renderUI({
+    df <- data_sosial()
+    # Cari kolom yang bisa dijadikan faktor (character, factor, atau numerik dengan nilai unik sedikit)
+    kolom_faktor <- names(df)[sapply(df, function(x) {
+      is.character(x) || is.factor(x) || (is.numeric(x) && length(unique(x[!is.na(x)])) <= 10)
+    })]
+    kolom_faktor <- setdiff(kolom_faktor, c(nama_kolom_kode, nama_kolom_kabupaten))
+    
+    # Tambahkan kategori dari manajemen data jika tersedia
+    if(exists("kategori_info") && !is.null(try(kategori_info(), silent = TRUE))) {
+      kolom_faktor <- c("Kategori (dari Manajemen Data)" = "Kategori", kolom_faktor)
+    }
+    
+    selectInput("anova2_factor1", "Pilih Faktor 1:", choices = kolom_faktor)
+  })
+  
+  # Selector untuk faktor 2
+  output$anova2_factor2_selector <- renderUI({
+    df <- data_sosial()
+    kolom_faktor <- names(df)[sapply(df, function(x) {
+      is.character(x) || is.factor(x) || (is.numeric(x) && length(unique(x[!is.na(x)])) <= 10)
+    })]
+    kolom_faktor <- setdiff(kolom_faktor, c(nama_kolom_kode, nama_kolom_kabupaten, input$anova2_factor1))
+    
+    # Tambahkan kategori dari manajemen data jika tersedia dan tidak sama dengan faktor 1
+    if(exists("kategori_info") && !is.null(try(kategori_info(), silent = TRUE)) && input$anova2_factor1 != "Kategori") {
+      kolom_faktor <- c("Kategori (dari Manajemen Data)" = "Kategori", kolom_faktor)
+    }
+    
+    selectInput("anova2_factor2", "Pilih Faktor 2:", choices = kolom_faktor)
+  })
+  
+  # Model ANOVA 2 arah
+  anova2_model <- reactive({
+    req(input$anova2_var, input$anova2_factor1, input$anova2_factor2)
+    
+    # Siapkan data
+    if(input$anova2_factor1 == "Kategori" || input$anova2_factor2 == "Kategori") {
+      validate(need(!is.null(try(kategori_info(), silent = TRUE)), "Kategori dari 'Manajemen Data' tidak tersedia. Silakan buat kategori terlebih dahulu."))
+      df <- kategori_info()$data
+    } else {
+      df <- data_sosial()
+    }
+    
+    # Pastikan faktor berbeda
+    validate(need(input$anova2_factor1 != input$anova2_factor2, "Faktor 1 dan Faktor 2 harus berbeda."))
+    
+    # Ambil data yang diperlukan
+    var_cols <- c(input$anova2_var, input$anova2_factor1, input$anova2_factor2)
+    df_subset <- df[, var_cols, drop = FALSE]
+    df_subset <- df_subset[complete.cases(df_subset), ]
+    
+    # Konversi faktor menjadi factor
+    df_subset[[input$anova2_factor1]] <- as.factor(df_subset[[input$anova2_factor1]])
+    df_subset[[input$anova2_factor2]] <- as.factor(df_subset[[input$anova2_factor2]])
+    
+    # Validasi jumlah level faktor
+    validate(
+      need(length(levels(df_subset[[input$anova2_factor1]])) >= 2, paste("Faktor 1 harus memiliki minimal 2 level.")),
+      need(length(levels(df_subset[[input$anova2_factor2]])) >= 2, paste("Faktor 2 harus memiliki minimal 2 level.")),
+      need(nrow(df_subset) >= 10, "Data terlalu sedikit untuk ANOVA 2 arah (minimal 10 observasi).")
+    )
+    
+    # Buat formula
+    if(input$anova2_interaction) {
+      formula_str <- paste("`", input$anova2_var, "` ~ `", input$anova2_factor1, "` * `", input$anova2_factor2, "`", sep = "")
+    } else {
+      formula_str <- paste("`", input$anova2_var, "` ~ `", input$anova2_factor1, "` + `", input$anova2_factor2, "`", sep = "")
+    }
+    
+    formula_anova2 <- as.formula(formula_str)
+    
+    # Fit model
+    model <- aov(formula_anova2, data = df_subset)
+    
+    return(list(model = model, data = df_subset))
+  })
+  
+  # Tabel hasil ANOVA 2 arah
+  output$anova2_result_table <- renderUI({
+    model_info <- anova2_model()
+    req(model_info)
+    
+    model_summary <- summary(model_info$model)
+    df_res <- as.data.frame(model_summary[[1]])
+    df_res <- tibble::rownames_to_column(df_res, "Sumber Variasi")
+    names(df_res)[names(df_res) == "Pr(>F)"] <- "P-value"
+    
+    ft <- flextable(df_res) %>% 
+      colformat_double(j = c("Df", "Sum Sq", "Mean Sq", "F value", "P-value"), big.mark = "", digits = 4) %>%
+      autofit() %>%
+      theme_box() %>%
+      color(j = "P-value", color = function(x) ifelse(x < 0.05, "red", "black"))
+    htmltools_value(ft)
+  })
+  
+  # Post-hoc untuk faktor 1
+  output$anova2_posthoc_factor1 <- renderUI({
+    model_info <- anova2_model()
+    req(model_info)
+    
+    # Cek apakah faktor 1 signifikan
+    model_summary <- summary(model_info$model)[[1]]
+    factor1_pvalue <- model_summary[rownames(model_summary) == paste("`", input$anova2_factor1, "`", sep = ""), "Pr(>F)"]
+    
+    if(!is.na(factor1_pvalue) && factor1_pvalue < 0.05) {
+      # Lakukan post-hoc untuk faktor 1
+      posthoc_result <- TukeyHSD(model_info$model, which = paste("`", input$anova2_factor1, "`", sep = ""))
+      
+      if(length(posthoc_result) > 0) {
+        df_posthoc <- as.data.frame(posthoc_result[[1]])
+        df_posthoc <- tibble::rownames_to_column(df_posthoc, "Perbandingan")
+        names(df_posthoc)[names(df_posthoc) == "p adj"] <- "P-value Adjusted"
+        
+        ft <- flextable(df_posthoc) %>%
+          colformat_double(j = c("diff", "lwr", "upr", "P-value Adjusted"), big.mark = "", digits = 4) %>%
+          autofit() %>%
+          theme_box() %>%
+          color(j = "P-value Adjusted", color = function(x) ifelse(x < 0.05, "red", "black"))
+        
+        tagList(
+          h5(paste("Post-Hoc Tukey HSD untuk", input$anova2_factor1, ":")),
+          htmltools_value(ft)
+        )
+      }
+    } else {
+      h5(paste("Post-Hoc untuk", input$anova2_factor1, ": Tidak signifikan (p >= 0.05)"))
+    }
+  })
+  
+  # Post-hoc untuk faktor 2
+  output$anova2_posthoc_factor2 <- renderUI({
+    model_info <- anova2_model()
+    req(model_info)
+    
+    # Cek apakah faktor 2 signifikan
+    model_summary <- summary(model_info$model)[[1]]
+    factor2_pvalue <- model_summary[rownames(model_summary) == paste("`", input$anova2_factor2, "`", sep = ""), "Pr(>F)"]
+    
+    if(!is.na(factor2_pvalue) && factor2_pvalue < 0.05) {
+      # Lakukan post-hoc untuk faktor 2
+      posthoc_result <- TukeyHSD(model_info$model, which = paste("`", input$anova2_factor2, "`", sep = ""))
+      
+      if(length(posthoc_result) > 0) {
+        df_posthoc <- as.data.frame(posthoc_result[[1]])
+        df_posthoc <- tibble::rownames_to_column(df_posthoc, "Perbandingan")
+        names(df_posthoc)[names(df_posthoc) == "p adj"] <- "P-value Adjusted"
+        
+        ft <- flextable(df_posthoc) %>%
+          colformat_double(j = c("diff", "lwr", "upr", "P-value Adjusted"), big.mark = "", digits = 4) %>%
+          autofit() %>%
+          theme_box() %>%
+          color(j = "P-value Adjusted", color = function(x) ifelse(x < 0.05, "red", "black"))
+        
+        tagList(
+          h5(paste("Post-Hoc Tukey HSD untuk", input$anova2_factor2, ":")),
+          htmltools_value(ft)
+        )
+      }
+    } else {
+      h5(paste("Post-Hoc untuk", input$anova2_factor2, ": Tidak signifikan (p >= 0.05)"))
+    }
+  })
+  
+  # Interpretasi ANOVA 2 arah
+  output$anova2_interpretation <- renderText({
+    model_info <- anova2_model()
+    req(model_info)
+    
+    model_summary <- summary(model_info$model)[[1]]
+    
+    # Ambil p-values
+    factor1_pvalue <- model_summary[rownames(model_summary) == paste("`", input$anova2_factor1, "`", sep = ""), "Pr(>F)"]
+    factor2_pvalue <- model_summary[rownames(model_summary) == paste("`", input$anova2_factor2, "`", sep = ""), "Pr(>F)"]
+    
+    interpretasi <- "HASIL ANOVA DUA ARAH:\n\n"
+    
+    # Interpretasi faktor 1
+    if(!is.na(factor1_pvalue)) {
+      if(factor1_pvalue < 0.05) {
+        interpretasi <- paste0(interpretasi, "• ", input$anova2_factor1, ": SIGNIFIKAN (p = ", round(factor1_pvalue, 4), "). Faktor ini berpengaruh signifikan terhadap variabel dependen.\n")
+      } else {
+        interpretasi <- paste0(interpretasi, "• ", input$anova2_factor1, ": TIDAK SIGNIFIKAN (p = ", round(factor1_pvalue, 4), "). Faktor ini tidak berpengaruh signifikan.\n")
+      }
+    }
+    
+    # Interpretasi faktor 2
+    if(!is.na(factor2_pvalue)) {
+      if(factor2_pvalue < 0.05) {
+        interpretasi <- paste0(interpretasi, "• ", input$anova2_factor2, ": SIGNIFIKAN (p = ", round(factor2_pvalue, 4), "). Faktor ini berpengaruh signifikan terhadap variabel dependen.\n")
+      } else {
+        interpretasi <- paste0(interpretasi, "• ", input$anova2_factor2, ": TIDAK SIGNIFIKAN (p = ", round(factor2_pvalue, 4), "). Faktor ini tidak berpengaruh signifikan.\n")
+      }
+    }
+    
+    # Interpretasi interaksi (jika ada)
+    if(input$anova2_interaction) {
+      interaction_row <- paste("`", input$anova2_factor1, "`:`", input$anova2_factor2, "`", sep = "")
+      interaction_pvalue <- model_summary[rownames(model_summary) == interaction_row, "Pr(>F)"]
+      
+      if(!is.na(interaction_pvalue)) {
+        if(interaction_pvalue < 0.05) {
+          interpretasi <- paste0(interpretasi, "• INTERAKSI: SIGNIFIKAN (p = ", round(interaction_pvalue, 4), "). Ada efek interaksi antara kedua faktor.\n")
+        } else {
+          interpretasi <- paste0(interpretasi, "• INTERAKSI: TIDAK SIGNIFIKAN (p = ", round(interaction_pvalue, 4), "). Tidak ada efek interaksi yang signifikan.\n")
+        }
+      }
+    }
+    
+    return(interpretasi)
+  })
+  
   output$download_anova <- downloadHandler(
     filename = function() paste0("hasil_anova_", Sys.Date(), ".docx"),
     content = function(file) {
       doc <- read_docx() %>% body_add_par("Hasil Analisis Varians (ANOVA)", style = "heading 1")
       
+      # ANOVA Satu Arah
       doc %>% body_add_par("ANOVA Satu Arah", style = "heading 2")
       anova1_safe <- tryCatch({
         df_res <- as.data.frame(summary(anova1_model())[[1]])
@@ -1157,6 +1412,104 @@ server <- function(input, output, session) {
         doc %>% body_add_flextable(ft_posthoc)
       }, error = function(e) {
         doc %>% body_add_par(paste("Gagal menjalankan ANOVA Satu Arah:", e$message))
+      })
+      
+      # ANOVA Dua Arah
+      doc %>% body_add_par("ANOVA Dua Arah", style = "heading 2")
+      anova2_safe <- tryCatch({
+        if(!is.null(input$anova2_var) && !is.null(input$anova2_factor1) && !is.null(input$anova2_factor2)) {
+          model_info <- anova2_model()
+          
+          doc %>% body_add_par(paste("Variabel Dependen:", input$anova2_var))
+          doc %>% body_add_par(paste("Faktor 1:", input$anova2_factor1))
+          doc %>% body_add_par(paste("Faktor 2:", input$anova2_factor2))
+          doc %>% body_add_par(paste("Interaksi:", ifelse(input$anova2_interaction, "Ya", "Tidak")))
+          
+          # Tabel ANOVA 2 arah
+          model_summary <- summary(model_info$model)
+          df_res2 <- as.data.frame(model_summary[[1]])
+          df_res2 <- tibble::rownames_to_column(df_res2, "Sumber Variasi")
+          names(df_res2)[names(df_res2) == "Pr(>F)"] <- "P-value"
+          ft2 <- flextable(df_res2) %>% colformat_double(j = 2:6, big.mark = "", digits = 4) %>% autofit() %>% theme_box()
+          doc %>% body_add_flextable(ft2)
+          
+          # Interpretasi ANOVA 2 arah
+          doc %>% body_add_par("Interpretasi:", style="heading 3")
+          
+          # Ambil p-values
+          factor1_pvalue <- model_summary[[1]][rownames(model_summary[[1]]) == paste("`", input$anova2_factor1, "`", sep = ""), "Pr(>F)"]
+          factor2_pvalue <- model_summary[[1]][rownames(model_summary[[1]]) == paste("`", input$anova2_factor2, "`", sep = ""), "Pr(>F)"]
+          
+          interpretasi2 <- "HASIL ANOVA DUA ARAH:\n\n"
+          
+          # Interpretasi faktor 1
+          if(!is.na(factor1_pvalue)) {
+            if(factor1_pvalue < 0.05) {
+              interpretasi2 <- paste0(interpretasi2, "• ", input$anova2_factor1, ": SIGNIFIKAN (p = ", round(factor1_pvalue, 4), "). Faktor ini berpengaruh signifikan terhadap variabel dependen.\n")
+            } else {
+              interpretasi2 <- paste0(interpretasi2, "• ", input$anova2_factor1, ": TIDAK SIGNIFIKAN (p = ", round(factor1_pvalue, 4), "). Faktor ini tidak berpengaruh signifikan.\n")
+            }
+          }
+          
+          # Interpretasi faktor 2
+          if(!is.na(factor2_pvalue)) {
+            if(factor2_pvalue < 0.05) {
+              interpretasi2 <- paste0(interpretasi2, "• ", input$anova2_factor2, ": SIGNIFIKAN (p = ", round(factor2_pvalue, 4), "). Faktor ini berpengaruh signifikan terhadap variabel dependen.\n")
+            } else {
+              interpretasi2 <- paste0(interpretasi2, "• ", input$anova2_factor2, ": TIDAK SIGNIFIKAN (p = ", round(factor2_pvalue, 4), "). Faktor ini tidak berpengaruh signifikan.\n")
+            }
+          }
+          
+          # Interpretasi interaksi (jika ada)
+          if(input$anova2_interaction) {
+            interaction_row <- paste("`", input$anova2_factor1, "`:`", input$anova2_factor2, "`", sep = "")
+            interaction_pvalue <- model_summary[[1]][rownames(model_summary[[1]]) == interaction_row, "Pr(>F)"]
+            
+            if(!is.na(interaction_pvalue)) {
+              if(interaction_pvalue < 0.05) {
+                interpretasi2 <- paste0(interpretasi2, "• INTERAKSI: SIGNIFIKAN (p = ", round(interaction_pvalue, 4), "). Ada efek interaksi antara kedua faktor.\n")
+              } else {
+                interpretasi2 <- paste0(interpretasi2, "• INTERAKSI: TIDAK SIGNIFIKAN (p = ", round(interaction_pvalue, 4), "). Tidak ada efek interaksi yang signifikan.\n")
+              }
+            }
+          }
+          
+          doc %>% body_add_par(interpretasi2)
+          
+          # Post-hoc tests
+          doc %>% body_add_par("Uji Lanjutan (Post-Hoc)", style="heading 3")
+          
+          # Post-hoc untuk faktor 1 jika signifikan
+          if(!is.na(factor1_pvalue) && factor1_pvalue < 0.05) {
+            posthoc1_result <- TukeyHSD(model_info$model, which = paste("`", input$anova2_factor1, "`", sep = ""))
+            if(length(posthoc1_result) > 0) {
+              doc %>% body_add_par(paste("Post-Hoc Tukey HSD untuk", input$anova2_factor1, ":"))
+              df_posthoc1 <- as.data.frame(posthoc1_result[[1]])
+              df_posthoc1 <- tibble::rownames_to_column(df_posthoc1, "Perbandingan")
+              names(df_posthoc1)[names(df_posthoc1) == "p adj"] <- "P-value Adjusted"
+              ft_posthoc1 <- flextable(df_posthoc1) %>% colformat_double(j = 2:5, big.mark = "", digits = 4) %>% autofit() %>% theme_box()
+              doc %>% body_add_flextable(ft_posthoc1)
+            }
+          }
+          
+          # Post-hoc untuk faktor 2 jika signifikan
+          if(!is.na(factor2_pvalue) && factor2_pvalue < 0.05) {
+            posthoc2_result <- TukeyHSD(model_info$model, which = paste("`", input$anova2_factor2, "`", sep = ""))
+            if(length(posthoc2_result) > 0) {
+              doc %>% body_add_par(paste("Post-Hoc Tukey HSD untuk", input$anova2_factor2, ":"))
+              df_posthoc2 <- as.data.frame(posthoc2_result[[1]])
+              df_posthoc2 <- tibble::rownames_to_column(df_posthoc2, "Perbandingan")
+              names(df_posthoc2)[names(df_posthoc2) == "p adj"] <- "P-value Adjusted"
+              ft_posthoc2 <- flextable(df_posthoc2) %>% colformat_double(j = 2:5, big.mark = "", digits = 4) %>% autofit() %>% theme_box()
+              doc %>% body_add_flextable(ft_posthoc2)
+            }
+          }
+          
+        } else {
+          doc %>% body_add_par("ANOVA Dua Arah tidak dijalankan atau tidak ada input yang dipilih.")
+        }
+      }, error = function(e) {
+        doc %>% body_add_par(paste("Gagal menjalankan ANOVA Dua Arah:", e$message))
       })
       
       print(doc, target = file)
