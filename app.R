@@ -23,6 +23,8 @@ library(cluster) # Untuk analisis clustering
 library(factoextra) # Untuk visualisasi clustering
 library(fpc) # Untuk validasi clustering
 library(scales) # Untuk formatting dalam plot
+library(writexl) # Untuk export Excel
+library(rmarkdown) # Untuk render PDF
 
 #================================================================#
 #                           UI (USER INTERFACE)                  #
@@ -83,18 +85,41 @@ ui <- dashboardPage(
                               choices = c(2, 3, 5), selected = 3),
                   hr(),
                   h4("Unduh Hasil"),
-                  downloadButton("download_data", "Unduh Data (CSV)"),
-                  downloadButton("download_interpretasi", "Unduh Interpretasi (TXT)")
+                  div(style = "margin-bottom: 10px;",
+                      downloadButton("download_data_csv", "Data (CSV)", class = "btn-primary btn-sm", style = "margin-right: 5px;"),
+                      downloadButton("download_data_excel", "Data (Excel)", class = "btn-success btn-sm")
+                  ),
+                  div(style = "margin-bottom: 10px;",
+                      downloadButton("download_interpretasi_txt", "Interpretasi (TXT)", class = "btn-info btn-sm", style = "margin-right: 5px;"),
+                      downloadButton("download_interpretasi_word", "Interpretasi (Word)", class = "btn-warning btn-sm")
+                  ),
+                  downloadButton("download_laporan_lengkap", "Laporan Lengkap (PDF)", class = "btn-danger btn-sm")
                 ),
                 box(
                   title = "Hasil Kategorisasi Data",
                   width = 8,
                   solidHeader = TRUE,
                   status = "primary",
-                  DTOutput("tabel_data"),
-                  hr(),
-                  h4("Interpretasi"),
-                  verbatimTextOutput("interpretasi_output")
+                  tabsetPanel(
+                    tabPanel("Tabel Data",
+                             DTOutput("tabel_data"),
+                             br(),
+                             h5("Keterangan:"),
+                             p("Tabel menampilkan data asli dengan kategori yang telah dibuat berdasarkan metode Equal Interval.")
+                    ),
+                    tabPanel("Ringkasan Statistik",
+                             DTOutput("summary_stats_table"),
+                             br(),
+                             h5("Keterangan:"),
+                             p("Statistik deskriptif untuk variabel yang dipilih dan distribusi per kategori.")
+                    ),
+                    tabPanel("Interpretasi",
+                             verbatimTextOutput("interpretasi_output"),
+                             br(),
+                             h5("Penjelasan Metode:"),
+                             p("Equal Interval: Membagi rentang nilai menjadi interval yang sama panjang berdasarkan nilai minimum dan maksimum data.")
+                    )
+                  )
                 )
               )
       ),
@@ -568,13 +593,79 @@ server <- function(input, output, session) {
   output$tabel_data <- renderDT({
     req(input$variabel)
     data_to_show <- kategori_info()$data %>% select(all_of(nama_kolom_kode), all_of(nama_kolom_kabupaten), all_of(input$variabel), Kategori)
-    dt <- datatable(data_to_show, rownames = FALSE, options = list(pageLength = 10, scrollX = TRUE), selection = 'none')
+    dt <- datatable(data_to_show, 
+                   rownames = FALSE, 
+                   options = list(pageLength = 10, scrollX = TRUE), 
+                   selection = 'none',
+                   filter = 'top')
     if (input$variabel %in% jumlah_vars) {
       dt <- dt %>% formatRound(columns = input$variabel, digits = 0, mark = "")
     } else {
       dt <- dt %>% formatRound(columns = input$variabel, digits = 2, mark = "", dec.mark = ".")
     }
-    dt
+    
+    # Tambahkan color coding untuk kategori
+    dt %>% formatStyle('Kategori',
+                      backgroundColor = styleEqual(
+                        unique(data_to_show$Kategori),
+                        rainbow(length(unique(data_to_show$Kategori)), alpha = 0.3)
+                      ))
+  })
+  
+  # Tabel ringkasan statistik
+  output$summary_stats_table <- renderDT({
+    req(input$variabel)
+    
+    # Statistik deskriptif variabel asli
+    data_original <- data_sosial()[[input$variabel]]
+    info <- kategori_info()
+    
+    # Statistik umum
+    stats_umum <- data.frame(
+      Metrik = c("Total Observasi", "Nilai Minimum", "Nilai Maksimum", "Rata-rata", "Median", "Standar Deviasi", "Varians"),
+      Nilai = c(
+        length(data_original),
+        round(min(data_original, na.rm = TRUE), 3),
+        round(max(data_original, na.rm = TRUE), 3),
+        round(mean(data_original, na.rm = TRUE), 3),
+        round(median(data_original, na.rm = TRUE), 3),
+        round(sd(data_original, na.rm = TRUE), 3),
+        round(var(data_original, na.rm = TRUE), 3)
+      ),
+      Kategori = rep("Statistik Umum", 7)
+    )
+    
+    # Statistik per kategori
+    kategori_counts <- table(info$data$Kategori)
+    stats_kategori <- data.frame(
+      Metrik = paste("Jumlah", names(kategori_counts)),
+      Nilai = as.numeric(kategori_counts),
+      Kategori = rep("Distribusi Kategori", length(kategori_counts))
+    )
+    
+    # Persentase per kategori
+    stats_persen <- data.frame(
+      Metrik = paste("Persentase", names(kategori_counts)),
+      Nilai = paste0(round(as.numeric(kategori_counts) / sum(kategori_counts) * 100, 1), "%"),
+      Kategori = rep("Persentase", length(kategori_counts))
+    )
+    
+    # Gabungkan semua statistik
+    all_stats <- rbind(stats_umum, stats_kategori, stats_persen)
+    
+    datatable(all_stats, 
+              options = list(
+                pageLength = 15, 
+                scrollX = TRUE,
+                dom = 't'
+              ), 
+              rownames = FALSE) %>%
+      formatStyle('Kategori', fontWeight = 'bold') %>%
+      formatStyle('Kategori',
+                  backgroundColor = styleEqual(
+                    c("Statistik Umum", "Distribusi Kategori", "Persentase"),
+                    c("#e8f4f8", "#f0f8e8", "#f8f0e8")
+                  ))
   })
   
   output$interpretasi_output <- renderText({
@@ -590,17 +681,227 @@ server <- function(input, output, session) {
            length(info$labels), " kelompok.\nMetode: Equal Interval.\n\nRentang Nilai:\n", rentang_teks)
   })
   
-  output$download_data <- downloadHandler(
-    filename = function() paste0("hasil_kategorisasi_", input$variabel, ".csv"),
+  # Download data dalam format CSV
+  output$download_data_csv <- downloadHandler(
+    filename = function() {
+      paste0("data_kategorisasi_", gsub("[^A-Za-z0-9]", "_", input$variabel), "_", Sys.Date(), ".csv")
+    },
     content = function(file) {
-      write.csv(kategori_info()$data, file, row.names = FALSE)
+      data_to_download <- kategori_info()$data
+      write.csv(data_to_download, file, row.names = FALSE, fileEncoding = "UTF-8")
     }
   )
   
-  output$download_interpretasi <- downloadHandler(
-    filename = function() paste0("interpretasi_", input$variabel, ".txt"),
+  # Download data dalam format Excel
+  output$download_data_excel <- downloadHandler(
+    filename = function() {
+      paste0("data_kategorisasi_", gsub("[^A-Za-z0-9]", "_", input$variabel), "_", Sys.Date(), ".xlsx")
+    },
     content = function(file) {
-      writeLines(output$interpretasi_output(), file)
+      data_to_download <- kategori_info()$data
+      writexl::write_xlsx(data_to_download, file)
+    }
+  )
+  
+  # Download interpretasi dalam format TXT
+  output$download_interpretasi_txt <- downloadHandler(
+    filename = function() {
+      paste0("interpretasi_", gsub("[^A-Za-z0-9]", "_", input$variabel), "_", Sys.Date(), ".txt")
+    },
+    content = function(file) {
+      interpretasi_text <- output$interpretasi_output()
+      
+      # Tambahkan header informasi
+      full_text <- paste0(
+        "=== LAPORAN KATEGORISASI DATA ===\n",
+        "Tanggal: ", Sys.Date(), "\n",
+        "Waktu: ", Sys.time(), "\n",
+        "Variabel: ", input$variabel, "\n",
+        "Jumlah Kategori: ", input$jumlah_kategori, "\n\n",
+        interpretasi_text, "\n\n",
+        "=== STATISTIK DESKRIPTIF ===\n"
+      )
+      
+      # Tambahkan statistik deskriptif
+      info <- kategori_info()
+      data_original <- data_sosial()[[input$variabel]]
+      stats_text <- paste0(
+        "Jumlah Data: ", length(data_original), "\n",
+        "Nilai Minimum: ", round(min(data_original, na.rm = TRUE), 3), "\n",
+        "Nilai Maksimum: ", round(max(data_original, na.rm = TRUE), 3), "\n",
+        "Rata-rata: ", round(mean(data_original, na.rm = TRUE), 3), "\n",
+        "Median: ", round(median(data_original, na.rm = TRUE), 3), "\n",
+        "Standar Deviasi: ", round(sd(data_original, na.rm = TRUE), 3), "\n\n",
+        "=== DISTRIBUSI PER KATEGORI ===\n"
+      )
+      
+      # Tambahkan distribusi per kategori
+      kategori_counts <- table(info$data$Kategori)
+      distribusi_text <- ""
+      for (i in 1:length(kategori_counts)) {
+        nama_kategori <- names(kategori_counts)[i]
+        jumlah <- kategori_counts[i]
+        persentase <- round(jumlah / sum(kategori_counts) * 100, 1)
+        distribusi_text <- paste0(distribusi_text, 
+                                nama_kategori, ": ", jumlah, " observasi (", persentase, "%)\n")
+      }
+      
+      final_text <- paste0(full_text, stats_text, distribusi_text)
+      writeLines(final_text, file, useBytes = TRUE)
+    }
+  )
+  
+  # Download interpretasi dalam format Word
+  output$download_interpretasi_word <- downloadHandler(
+    filename = function() {
+      paste0("interpretasi_", gsub("[^A-Za-z0-9]", "_", input$variabel), "_", Sys.Date(), ".docx")
+    },
+    content = function(file) {
+      doc <- read_docx() %>%
+        body_add_par("Laporan Kategorisasi Data", style = "heading 1")
+      
+      # Informasi umum
+      doc %>% body_add_par("Informasi Umum", style = "heading 2")
+      doc %>% body_add_par(paste("Tanggal:", Sys.Date()))
+      doc %>% body_add_par(paste("Variabel:", input$variabel))
+      doc %>% body_add_par(paste("Jumlah Kategori:", input$jumlah_kategori))
+      doc %>% body_add_par(paste("Metode:", "Equal Interval"))
+      
+      # Interpretasi
+      doc %>% body_add_par("Interpretasi", style = "heading 2")
+      interpretasi_lines <- strsplit(output$interpretasi_output(), "\n")[[1]]
+      for (line in interpretasi_lines) {
+        if (nchar(line) > 0) {
+          doc %>% body_add_par(line)
+        }
+      }
+      
+      # Statistik deskriptif
+      doc %>% body_add_par("Statistik Deskriptif", style = "heading 2")
+      data_original <- data_sosial()[[input$variabel]]
+      stats_table <- data.frame(
+        Statistik = c("Jumlah Data", "Nilai Minimum", "Nilai Maksimum", "Rata-rata", "Median", "Standar Deviasi"),
+        Nilai = c(
+          length(data_original),
+          round(min(data_original, na.rm = TRUE), 3),
+          round(max(data_original, na.rm = TRUE), 3),
+          round(mean(data_original, na.rm = TRUE), 3),
+          round(median(data_original, na.rm = TRUE), 3),
+          round(sd(data_original, na.rm = TRUE), 3)
+        )
+      )
+      doc %>% body_add_flextable(flextable(stats_table) %>% autofit() %>% theme_box())
+      
+      # Distribusi per kategori
+      doc %>% body_add_par("Distribusi per Kategori", style = "heading 2")
+      info <- kategori_info()
+      kategori_counts <- table(info$data$Kategori)
+      distribusi_table <- data.frame(
+        Kategori = names(kategori_counts),
+        Jumlah = as.numeric(kategori_counts),
+        Persentase = round(as.numeric(kategori_counts) / sum(kategori_counts) * 100, 1)
+      )
+      doc %>% body_add_flextable(flextable(distribusi_table) %>% autofit() %>% theme_box())
+      
+      print(doc, target = file)
+    }
+  )
+  
+  # Download laporan lengkap dalam format PDF
+  output$download_laporan_lengkap <- downloadHandler(
+    filename = function() {
+      paste0("laporan_kategorisasi_", gsub("[^A-Za-z0-9]", "_", input$variabel), "_", Sys.Date(), ".pdf")
+    },
+    content = function(file) {
+      # Buat temporary R Markdown file
+      temp_rmd <- tempfile(fileext = ".Rmd")
+      
+      # Siapkan data
+      info <- kategori_info()
+      data_original <- data_sosial()[[input$variabel]]
+      kategori_counts <- table(info$data$Kategori)
+      
+      # Konten R Markdown
+      rmd_content <- paste0('
+---
+title: "Laporan Kategorisasi Data"
+subtitle: "Variabel: ', input$variabel, '"
+date: "', Sys.Date(), '"
+output: pdf_document
+geometry: margin=2cm
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(ggplot2)
+library(knitr)
+```
+
+## Informasi Umum
+
+- **Variabel**: ', input$variabel, '
+- **Jumlah Kategori**: ', input$jumlah_kategori, '
+- **Metode**: Equal Interval
+- **Tanggal Analisis**: ', Sys.Date(), '
+
+## Interpretasi
+
+', gsub("\n", "\n\n", output$interpretasi_output()), '
+
+## Statistik Deskriptif
+
+```{r stats-table}
+stats_data <- data.frame(
+  Statistik = c("Jumlah Data", "Nilai Minimum", "Nilai Maksimum", "Rata-rata", "Median", "Standar Deviasi"),
+  Nilai = c(', length(data_original), ', ', round(min(data_original, na.rm = TRUE), 3), ', ', 
+              round(max(data_original, na.rm = TRUE), 3), ', ', round(mean(data_original, na.rm = TRUE), 3), ', ', 
+              round(median(data_original, na.rm = TRUE), 3), ', ', round(sd(data_original, na.rm = TRUE), 3), ')
+)
+kable(stats_data, caption = "Statistik Deskriptif")
+```
+
+## Distribusi per Kategori
+
+```{r dist-table}
+dist_data <- data.frame(
+  Kategori = c("', paste(names(kategori_counts), collapse = '", "'), '"),
+  Jumlah = c(', paste(as.numeric(kategori_counts), collapse = ', '), '),
+  Persentase = round(c(', paste(as.numeric(kategori_counts), collapse = ', '), ') / sum(c(', paste(as.numeric(kategori_counts), collapse = ', '), ')) * 100, 1)
+)
+kable(dist_data, caption = "Distribusi per Kategori")
+```
+
+## Visualisasi
+
+```{r plot, fig.height=4}
+# Bar plot distribusi kategori
+ggplot(dist_data, aes(x = Kategori, y = Jumlah, fill = Kategori)) +
+  geom_bar(stat = "identity", alpha = 0.8) +
+  geom_text(aes(label = paste0(Jumlah, "\\n(", Persentase, "%)")), 
+            vjust = -0.5, size = 3) +
+  labs(title = "Distribusi Data per Kategori",
+       x = "Kategori", y = "Jumlah Observasi") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_brewer(type = "qual", palette = "Set2")
+```
+')
+      
+      # Tulis file R Markdown
+      writeLines(rmd_content, temp_rmd)
+      
+      # Render ke PDF
+      tryCatch({
+        rmarkdown::render(temp_rmd, output_file = file, quiet = TRUE)
+      }, error = function(e) {
+        # Jika gagal render PDF, buat file teks sebagai fallback
+        writeLines(paste("Error rendering PDF:", e$message, 
+                        "\n\nFallback: Gunakan download TXT atau Word untuk laporan lengkap."), file)
+      })
+      
+      # Hapus file temporary
+      if (file.exists(temp_rmd)) file.remove(temp_rmd)
     }
   )
   
