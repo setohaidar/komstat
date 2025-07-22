@@ -83,13 +83,7 @@ ui <- dashboardPage(
                   uiOutput("variabel_selector"),
                   selectInput("jumlah_kategori", "Pilih Jumlah Kategori:",
                               choices = c(2, 3, 5), selected = 3),
-                  hr(),
-                  h4("Unduh Hasil"),
-                  div(style = "margin-bottom: 10px;",
-                      downloadButton("download_data_csv", "Data (CSV)", class = "btn-primary btn-sm", style = "margin-right: 5px;"),
-                      downloadButton("download_data_excel", "Data (Excel)", class = "btn-success btn-sm")
-                  ),
-                  downloadButton("download_manajemen_pdf", "Laporan Interpretasi (PDF)", class = "btn-danger btn-sm")
+                  hr()
                 ),
                 box(
                   title = "Hasil Kategorisasi Data",
@@ -165,12 +159,7 @@ ui <- dashboardPage(
                   )
                 )
               ),
-              fluidRow(
-                box(
-                  title = "Unduh Hasil", width = 12,
-                  downloadButton("download_asumsi", "Unduh Semua Hasil Uji (Word)")
-                )
-              )
+              
       ),
       
       tabItem(tabName = "uji_rata",
@@ -211,11 +200,7 @@ ui <- dashboardPage(
                     )
                 )
               ),
-              fluidRow(
-                box(title = "Unduh Hasil", width = 12,
-                    downloadButton("download_uji_rata", "Unduh Hasil Uji Rata-rata (Word)")
-                )
-              )
+              
       ),
       
       tabItem(tabName = "uji_varians",
@@ -256,11 +241,7 @@ ui <- dashboardPage(
                     )
                 )
               ),
-              fluidRow(
-                box(title = "Unduh Hasil", width = 12,
-                    downloadButton("download_uji_varians", "Unduh Hasil Uji Varians (Word)")
-                )
-              )
+              
       ),
       
       tabItem(tabName = "uji_proporsi",
@@ -309,13 +290,7 @@ ui <- dashboardPage(
                   textOutput("prop2_test_interpretation")
                 )
               ),
-              fluidRow(
-                box(title = "Unduh Hasil", width = 12,
-                    downloadButton("download_uji_proporsi", "Unduh Hasil Uji Proporsi (Word)"),
-                    br(), br(),
-                    downloadButton("download_proporsi_pdf", "Laporan Interpretasi (PDF)", class = "btn-danger")
-                )
-              )
+              
       ),
       
       tabItem(tabName = "anova",
@@ -334,7 +309,7 @@ ui <- dashboardPage(
                            uiOutput("anova1_result_table"),
                            hr(),
                            h4("Uji Lanjutan (Post-Hoc Tukey HSD)"),
-                           p("Tabel ini menunjukkan perbandingan antar-pasang kelompok. Jika p-value < 0.05, maka rata-rata kedua kelompok tersebut berbeda signifikan."),
+                           p("Tabel ini menunjukkan perbandingan antarpasang kelompok. Jika P-value < 0.05, maka rata-rata antara kedua kelompok tersebut berbeda signifikan."),
                            uiOutput("anova1_posthoc_table"),
                            hr(),
                            h5("Interpretasi Keseluruhan:", style = "font-weight:bold;"),
@@ -343,11 +318,7 @@ ui <- dashboardPage(
                   )
                 )
               ),
-              fluidRow(
-                box(title = "Unduh Hasil", width = 12,
-                    downloadButton("download_anova", "Unduh Hasil ANOVA (Word)")
-                )
-              )
+              
       ),
       
       # --- KONTEN HALAMAN BARU DITAMBAHKAN DI SINI --- #
@@ -366,13 +337,7 @@ ui <- dashboardPage(
                   helpText("Jika dicentang, akan menggunakan matriks penimbang jarak dari file Excel."),
                   
                   hr(),
-                  actionButton("run_clustering", "Jalankan Analisis Clustering", icon = icon("play-circle"), class = "btn-primary"),
-                  
-                  hr(),
-                  h4("Unduh Hasil"),
-                  downloadButton("download_clustering", "Unduh Hasil Clustering (Word)"),
-                  br(), br(),
-                  downloadButton("download_clustering_pdf", "Laporan Interpretasi (PDF)", class = "btn-danger")
+                  actionButton("run_clustering", "Jalankan Analisis Clustering", icon = icon("play-circle"), class = "btn-primary")
                 ),
                 box(
                   title = "Hasil Clustering", width = 8, solidHeader = TRUE, status = "primary",
@@ -425,10 +390,7 @@ ui <- dashboardPage(
                   # --- BARIS INSTRUKSI DITAMBAHKAN DI SINI --- #
                   helpText("Tahan tombol Ctrl (Windows) atau Cmd (Mac) untuk memilih beberapa variabel."),
                   
-                  actionButton("run_regression", "Jalankan Analisis Regresi", icon = icon("play-circle")),
-                  hr(),
-                  h4("Unduh Hasil"),
-                  downloadButton("download_regresi", "Unduh Hasil Regresi (Word)")
+                  actionButton("run_regression", "Jalankan Analisis Regresi", icon = icon("play-circle"))
                 ),
                 box(
                   title = "Hasil Model Regresi Linear Berganda", width = 8, solidHeader = TRUE, status = "primary",
@@ -486,10 +448,7 @@ ui <- dashboardPage(
                   selectInput("variabel_eksplorasi", "Pilih Variabel:", choices = NULL),
                   radioButtons("pilihan_peringkat", "Tampilkan Peringkat:",
                                choices = c("10 Tertinggi" = "top", "10 Terendah" = "bottom"),
-                               selected = "top"),
-                  hr(),
-                  downloadButton("unduh_laporan", "Unduh Laporan (Word)"),
-                  downloadButton("unduh_gabungan", "Unduh Semua Halaman")
+                               selected = "top")
                 ),
                 box(
                   title = "Statistik Deskriptif", width = 8, status = "info", solidHeader = TRUE,
@@ -681,110 +640,7 @@ server <- function(input, output, session) {
            length(info$labels), " kelompok.\nMetode: Equal Interval.\n\nRentang Nilai:\n", rentang_teks)
   })
   
-  # Download data dalam format CSV
-  output$download_data_csv <- downloadHandler(
-    filename = function() {
-      paste0("data_kategorisasi_", gsub("[^A-Za-z0-9]", "_", input$variabel), "_", Sys.Date(), ".csv")
-    },
-    content = function(file) {
-      data_to_download <- kategori_info()$data
-      write.csv(data_to_download, file, row.names = FALSE, fileEncoding = "UTF-8")
-    }
-  )
   
-  # Download data dalam format Excel
-  output$download_data_excel <- downloadHandler(
-    filename = function() {
-      paste0("data_kategorisasi_", gsub("[^A-Za-z0-9]", "_", input$variabel), "_", Sys.Date(), ".xlsx")
-    },
-    content = function(file) {
-      data_to_download <- kategori_info()$data
-      writexl::write_xlsx(data_to_download, file)
-    }
-  )
-  
-  # Download laporan interpretasi dalam format PDF
-  output$download_manajemen_pdf <- downloadHandler(
-    filename = function() paste("laporan_kategorisasi_", gsub("[^A-Za-z0-9]", "_", input$variabel), "_", Sys.Date(), ".pdf", sep = ""),
-    content = function(file) {
-      req(input$variabel)
-      
-      # Header informasi
-      header_text <- paste0(
-        "LAPORAN KATEGORISASI DATA SIGABISA\n",
-        "Sistem Informasi Geospasial Ancaman Bencana berbasis Indikator Sosial\n",
-        "Tanggal: ", format(Sys.Date(), "%d %B %Y"), "\n",
-        "Variabel: ", input$variabel, "\n",
-        "Jumlah Kategori: ", input$jumlah_kategori, "\n",
-        "Metode: Equal Interval\n",
-        paste(rep("=", 80), collapse = "")
-      )
-      
-      header_grob <- gridExtra::tableGrob(
-        data.frame(Header = header_text),
-        theme = gridExtra::ttheme_minimal(
-          base_size = 12,
-          core = list(fg_params = list(hjust = 0, x = 0.02)),
-          colhead = list(fg_params = list(hjust = 0, x = 0.02))
-        ),
-        rows = NULL, cols = NULL
-      )
-      
-      # Interpretasi
-      interpretasi_text <- output$interpretasi_output()
-      interpretation_lines <- unlist(strsplit(interpretasi_text, "\n"))
-      interpretation_formatted <- data.frame(
-        Interpretasi = interpretation_lines[interpretation_lines != ""]
-      )
-      
-      interpretation_grob <- gridExtra::tableGrob(
-        interpretation_formatted,
-        theme = gridExtra::ttheme_minimal(
-          base_size = 10,
-          core = list(
-            fg_params = list(hjust = 0, x = 0.02),
-            bg_params = list(fill = "white")
-          ),
-          colhead = list(
-            fg_params = list(hjust = 0, x = 0.02, fontface = "bold"),
-            bg_params = list(fill = "lightgray")
-          )
-        ),
-        rows = NULL
-      )
-      
-      # Buat plot distribusi kategori
-      info <- kategori_info()
-      kategori_counts <- table(info$data$Kategori)
-      plot_data <- data.frame(
-        Kategori = names(kategori_counts),
-        Jumlah = as.numeric(kategori_counts),
-        Persentase = round(as.numeric(kategori_counts) / sum(kategori_counts) * 100, 1)
-      )
-      
-      viz_plot <- ggplot(plot_data, aes(x = Kategori, y = Jumlah, fill = Kategori)) +
-        geom_bar(stat = "identity", alpha = 0.8) +
-        geom_text(aes(label = paste0(Jumlah, "\n(", Persentase, "%)")), 
-                  vjust = -0.5, size = 3) +
-        labs(title = "Distribusi Data per Kategori",
-             x = "Kategori", y = "Jumlah Observasi") +
-        theme_minimal() +
-        theme(legend.position = "none",
-              axis.text.x = element_text(angle = 45, hjust = 1)) +
-        scale_fill_brewer(type = "qual", palette = "Set2")
-      
-      # Gabungkan semua komponen
-      combined_plot <- gridExtra::grid.arrange(
-        header_grob,
-        viz_plot,
-        interpretation_grob,
-        ncol = 1,
-        heights = c(0.8, 3, 1.5)
-      )
-      
-      ggsave(file, combined_plot, width = 12, height = 16, device = "pdf", dpi = 300)
-    }
-  )
   
   #--- LOGIKA UNTUK UJI ASUMSI ---#
   output$norm_var_selector <- renderUI({
@@ -830,7 +686,7 @@ server <- function(input, output, session) {
     test_result <- norm_test_output(); req(test_result)
     if (!is.null(test_result$error)) return("")
     p_value <- test_result$p.value
-    if (p_value > 0.05) paste0("Kesimpulan: P-value (", round(p_value, 4), ") > 0.05, maka data berdistribusi normal.") else paste0("Kesimpulan: P-value (", round(p_value, 4), ") <= 0.05, maka data tidak berdistribusi normal.")
+    if (p_value > 0.05) paste0("Kesimpulan: P-value = ", round(p_value, 4), " dan nilainya lebih besar dibanding 0.05, maka data berdistribusi normal.") else paste0("Kesimpulan: P-value = ", round(p_value, 4), " dan nilainya lebih kecil atau sama dengan 0.05, maka data tidak berdistribusi normal.")
   })
   
   homog_test_output <- reactive({
@@ -852,30 +708,10 @@ server <- function(input, output, session) {
     test_result <- homog_test_output(); req(test_result)
     p_value <- test_result$`Pr(>F)`[1]
     if (is.na(p_value)) return("Tidak dapat mengambil P-value.")
-    if (p_value > 0.05) paste0("Kesimpulan: P-value (", round(p_value, 4), ") > 0.05, maka varian antar kelompok homogen.") else paste0("Kesimpulan: P-value (", round(p_value, 4), ") <= 0.05, maka varian antar kelompok tidak homogen.")
+    if (p_value > 0.05) paste0("Kesimpulan: P-value = " , round(p_value, 4), " dan nilainya lebih besar dibanding 0.05, maka varian antarkelompok homogen.") else paste0("Kesimpulan: P-value = ", round(p_value, 4), " dan nilainya lebih kecil atau sama dengan 0.05, maka varian antarkelompok tidak homogen.")
   })
   
-  output$download_asumsi <- downloadHandler(
-    filename = function() paste0("hasil_uji_asumsi_", Sys.Date(), ".docx"),
-    content = function(file) {
-      doc <- read_docx() %>% body_add_par("Hasil Uji Asumsi", style = "heading 1")
-      doc %>% body_add_par(if(input$norm_test_method == "shapiro") "Uji Normalitas (Shapiro-Wilk)" else "Uji Normalitas (Kolmogorov-Smirnov)", style = "heading 2")
-      doc %>% body_add_par(paste("Variabel:", input$norm_var))
-      doc %>% body_add_par(paste(capture.output(norm_test_output()), collapse="\n"))
-      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$norm_test_interpretation())
-      doc %>% body_add_par("Uji Homogenitas Varian (Levene's Test)", style = "heading 2")
-      doc %>% body_add_par(paste("Variabel:", input$homog_var, "| Grup:", input$variabel))
-      homog_output <- tryCatch(homog_test_output(), error = function(e) e)
-      if (!inherits(homog_output, "error")) {
-        df_homog <- as.data.frame(homog_output) %>% tibble::rownames_to_column("Sumber")
-        doc %>% body_add_flextable(flextable(df_homog) %>% autofit())
-        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$homog_test_interpretation())
-      } else {
-        doc %>% body_add_par(paste("Error:", as.character(homog_output)))
-      }
-      print(doc, target = file)
-    }
-  )
+  
   
   #--- LOGIKA UNTUK UJI BEDA RATA-RATA ---#
   output$ttest1_var_selector <- renderUI({
@@ -894,7 +730,7 @@ server <- function(input, output, session) {
   
   output$ttest1_interpretation <- renderText({
     p_value <- ttest1_output()$p.value
-    if (p_value > 0.05) paste0("Kesimpulan: P-value (", round(p_value, 4), ") > 0.05. Rata-rata sampel tidak berbeda signifikan dari nilai hipotesis (", input$ttest1_mu, ").") else paste0("Kesimpulan: P-value (", round(p_value, 4), ") <= 0.05. Rata-rata sampel berbeda signifikan dari nilai hipotesis (", input$ttest1_mu, ").")
+    if (p_value > 0.05) paste0("Kesimpulan: P-value = ", round(p_value, 4), " dan nilainya lebih besar dibanding 0.05. Maka dari itu, rata-rata sampel tidak berbeda signifikan dari Nilai Hipotesis Rata-Rata = ", input$ttest1_mu, " .") else paste0("Kesimpulan: P-value = ", round(p_value, 4), " dan nilainya lebih kecil atau sama dengan 0.05. Maka dari itu, rata-rata sampel berbeda signifikan dari Nilai Hipotesis Rata-Rata = ", input$ttest1_mu, ".")
   })
   
   output$ttest2_var_selector <- renderUI({
@@ -918,26 +754,7 @@ server <- function(input, output, session) {
     if (p_value > 0.05) "Kesimpulan: Tidak ada perbedaan rata-rata yang signifikan antara kedua kelompok." else "Kesimpulan: Terdapat perbedaan rata-rata yang signifikan antara kedua kelompok."
   })
   
-  output$download_uji_rata <- downloadHandler(
-    filename = function() paste0("hasil_uji_rata-rata_", Sys.Date(), ".docx"),
-    content = function(file) {
-      doc <- read_docx() %>% body_add_par("Hasil Uji Beda Rata-rata", style = "heading 1")
-      doc %>% body_add_par("Uji-t Satu Sampel", style = "heading 2")
-      doc %>% body_add_par(paste("Variabel:", input$ttest1_var, "| Nilai Hipotesis:", input$ttest1_mu))
-      doc %>% body_add_par(paste(capture.output(ttest1_output()), collapse="\n"))
-      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$ttest1_interpretation())
-      doc %>% body_add_par("Uji-t Dua Sampel Independen", style = "heading 2")
-      doc %>% body_add_par(paste("Variabel:", input$ttest2_var, "| Grup:", input$variabel))
-      ttest2_safe <- tryCatch(ttest2_output(), error=function(e)e)
-      if(!inherits(ttest2_safe, "error")){
-        doc %>% body_add_par(paste(capture.output(ttest2_safe), collapse="\n"))
-        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$ttest2_interpretation())
-      } else {
-        doc %>% body_add_par("Gagal: Uji ini memerlukan tepat 2 kategori.")
-      }
-      print(doc, target = file)
-    }
-  )
+  
   
   #--- LOGIKA UNTUK UJI VARIANS ---#
   output$var1_var_selector <- renderUI({
@@ -971,7 +788,7 @@ server <- function(input, output, session) {
   
   output$var1_test_interpretation <- renderText({
     p_value <- var1_test_output()$p.value
-    if (p_value > 0.05) paste0("Kesimpulan: Varians sampel tidak berbeda signifikan dari nilai hipotesis (", input$var1_sigma_sq, ").") else paste0("Kesimpulan: Varians sampel berbeda signifikan dari nilai hipotesis (", input$var1_sigma_sq, ").")
+    if (p_value > 0.05) paste0("Kesimpulan: Varians sampel tidak berbeda signifikan dari Nilai Hipotesis Varians= ", input$var1_sigma_sq, ".") else paste0("Kesimpulan: Varians sampel berbeda signifikan dari Nilai Hipotesis Varians = ", input$var1_sigma_sq, ".")
   })
   
   output$var2_var_selector <- renderUI({
@@ -1010,40 +827,7 @@ server <- function(input, output, session) {
     if (p_value > 0.05) "Kesimpulan: Tidak ada perbedaan varians yang signifikan antara kedua kelompok (varian homogen)." else "Kesimpulan: Terdapat perbedaan varians yang signifikan antara kedua kelompok (varian tidak homogen)."
   })
   
-  output$download_uji_varians <- downloadHandler(
-    filename = function() paste0("hasil_uji_varians_", Sys.Date(), ".docx"),
-    content = function(file) {
-      doc <- read_docx() %>% body_add_par("Hasil Uji Varians", style = "heading 1")
-      
-      doc %>% body_add_par("Uji Varians Satu Sampel (Chi-Square Test)", style = "heading 2")
-      doc %>% body_add_par(paste("Variabel:", input$var1_var, "| Nilai Hipotesis Varians:", input$var1_sigma_sq))
-      test_result1 <- var1_test_output()
-      df_res1 <- data.frame(
-        Statistik = c("Statistik Chi-Square", "Derajat Bebas (df)", "P-value", "Varians Sampel"),
-        Nilai = c(test_result1$statistic, test_result1$parameters, test_result1$p.value, test_result1$estimate)
-      )
-      ft1 <- flextable(df_res1) %>% colformat_double(j = "Nilai", big.mark = "", digits = 4) %>% autofit() %>% theme_box()
-      doc %>% body_add_flextable(ft1)
-      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$var1_test_interpretation())
-      
-      doc %>% body_add_par("Uji Varians Dua Sampel (F-Test)", style = "heading 2")
-      doc %>% body_add_par(paste("Variabel:", input$var2_var, "| Grup:", input$variabel))
-      var2_safe <- tryCatch(var2_test_output(), error = function(e) e)
-      if (!inherits(var2_safe, "error")) {
-        test_result2 <- var2_safe
-        df_res2 <- data.frame(
-          Statistik = c("Statistik F", "Derajat Bebas Numerator", "Derajat Bebas Denominator", "P-value", "Rasio Varians"),
-          Nilai = c(test_result2$statistic, test_result2$parameter[1], test_result2$parameter[2], test_result2$p.value, test_result2$estimate)
-        )
-        ft2 <- flextable(df_res2) %>% colformat_double(j = "Nilai", big.mark = "", digits = 4) %>% autofit() %>% theme_box()
-        doc %>% body_add_flextable(ft2)
-        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$var2_test_interpretation())
-      } else {
-        doc %>% body_add_par("Gagal: Uji ini memerlukan tepat 2 kategori yang diatur di tab 'Manajemen Data'.")
-      }
-      print(doc, target = file)
-    }
-  )
+  
   
   #--- LOGIKA UNTUK UJI PROPORSI ---#
   prop_data <- reactiveVal(NULL)
@@ -1115,9 +899,9 @@ server <- function(input, output, session) {
     validate(need(!is.null(prop_data()), ""))
     p_value <- prop1_test_output()$p.value
     if (p_value > 0.05) {
-      paste0("Kesimpulan: Proporsi sampel tidak berbeda signifikan dari proporsi hipotesis (", input$prop1_p_hipotesis, ").")
+      paste0("Kesimpulan: Proporsi sampel tidak berbeda signifikan dari Nilai Proporsi Hipotesis = ", input$prop1_p_hipotesis, ".")
     } else {
-      paste0("Kesimpulan: Proporsi sampel berbeda signifikan dari proporsi hipotesis (", input$prop1_p_hipotesis, ").")
+      paste0("Kesimpulan: Proporsi sampel berbeda signifikan dari Nilai Proporsi Hipotesis = ", input$prop1_p_hipotesis, ".")
     }
   })
   
@@ -1177,127 +961,9 @@ server <- function(input, output, session) {
     }
   })
   
-  output$download_uji_proporsi <- downloadHandler(
-    filename = function() paste0("hasil_uji_proporsi_", Sys.Date(), ".docx"),
-    content = function(file) {
-      doc <- read_docx() %>% body_add_par("Hasil Uji Proporsi", style = "heading 1")
-      
-      prop1_safe <- tryCatch(prop1_test_output(), error = function(e) e)
-      if (!inherits(prop1_safe, "error")) {
-        doc %>% body_add_par("Uji Proporsi Satu Sampel", style = "heading 2")
-        test_result1 <- prop1_safe
-        df_res1 <- data.frame(
-          Statistik = c("Statistik Chi-Square", "Derajat Bebas (df)", "P-value", "Proporsi Sampel"),
-          Nilai = c(test_result1$statistic, test_result1$parameter, test_result1$p.value, test_result1$estimate)
-        )
-        ft1 <- flextable(df_res1) %>% colformat_double(j = "Nilai", big.mark = "", digits = 4) %>% autofit() %>% theme_box()
-        doc %>% body_add_flextable(ft1)
-        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$prop1_test_interpretation())
-      }
-      
-      prop2_safe <- tryCatch(prop2_test_output(), error = function(e) e)
-      if (!inherits(prop2_safe, "error")) {
-        doc %>% body_add_par("Uji Proporsi Dua Sampel", style = "heading 2")
-        test_result2 <- prop2_safe
-        df_res2 <- data.frame(
-          Statistik = c("Statistik Chi-Square", "Derajat Bebas (df)", "P-value", "Proporsi Kelompok 1", "Proporsi Kelompok 2"),
-          Nilai = c(test_result2$statistic, test_result2$parameter, test_result2$p.value, test_result2$estimate[1], test_result2$estimate[2])
-        )
-        ft2 <- flextable(df_res2) %>% colformat_double(j = "Nilai", big.mark = "", digits = 4) %>% autofit() %>% theme_box()
-        doc %>% body_add_flextable(ft2)
-        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$prop2_test_interpretation())
-      }
-      
-      print(doc, target = file)
-    }
-  )
   
-  # Download laporan interpretasi uji proporsi dalam format PDF
-  output$download_proporsi_pdf <- downloadHandler(
-    filename = function() paste("laporan_uji_proporsi_", Sys.Date(), ".pdf", sep = ""),
-    content = function(file) {
-      req(prop_data())
-      
-      # Header informasi
-      header_text <- paste0(
-        "LAPORAN UJI PROPORSI SIGABISA\n",
-        "Sistem Informasi Geospasial Ancaman Bencana berbasis Indikator Sosial\n",
-        "Tanggal: ", format(Sys.Date(), "%d %B %Y"), "\n",
-        "Variabel: ", input$prop_var_biner, "\n",
-        "Label Sukses: ", input$prop_label_sukses, "\n",
-        "Label Gagal: ", input$prop_label_gagal, "\n",
-        paste(rep("=", 80), collapse = "")
-      )
-      
-      header_grob <- gridExtra::tableGrob(
-        data.frame(Header = header_text),
-        theme = gridExtra::ttheme_minimal(
-          base_size = 12,
-          core = list(fg_params = list(hjust = 0, x = 0.02)),
-          colhead = list(fg_params = list(hjust = 0, x = 0.02))
-        ),
-        rows = NULL, cols = NULL
-      )
-      
-      # Interpretasi
-      interpretasi_lines <- c(
-        paste("Interpretasi Uji Proporsi Satu Sampel:", output$prop1_test_interpretation()),
-        "",
-        paste("Interpretasi Uji Proporsi Dua Sampel:", output$prop2_test_interpretation())
-      )
-      interpretation_formatted <- data.frame(
-        Interpretasi = interpretasi_lines[interpretasi_lines != ""]
-      )
-      
-      interpretation_grob <- gridExtra::tableGrob(
-        interpretation_formatted,
-        theme = gridExtra::ttheme_minimal(
-          base_size = 10,
-          core = list(
-            fg_params = list(hjust = 0, x = 0.02),
-            bg_params = list(fill = "white")
-          ),
-          colhead = list(
-            fg_params = list(hjust = 0, x = 0.02, fontface = "bold"),
-            bg_params = list(fill = "lightgray")
-          )
-        ),
-        rows = NULL
-      )
-      
-      # Buat plot distribusi proporsi
-      df <- prop_data()
-      prop_counts <- table(df$prop_variable_biner)
-      plot_data <- data.frame(
-        Kategori = names(prop_counts),
-        Jumlah = as.numeric(prop_counts),
-        Proporsi = as.numeric(prop_counts) / sum(prop_counts)
-      )
-      
-      viz_plot <- ggplot(plot_data, aes(x = Kategori, y = Proporsi, fill = Kategori)) +
-        geom_col(alpha = 0.8, width = 0.6) +
-        geom_text(aes(label = paste0(round(Proporsi*100, 1), "%\n(n=", Jumlah, ")")), 
-                  vjust = -0.5, size = 4) +
-        scale_y_continuous(labels = scales::percent_format(), 
-                           limits = c(0, max(plot_data$Proporsi) * 1.1)) +
-        labs(title = "Distribusi Kategori Biner",
-             x = "Kategori", y = "Proporsi (%)") +
-        theme_minimal() +
-        theme(legend.position = "none") +
-        scale_fill_manual(values = c("#28a745", "#dc3545"))
-      
-      # Gabungkan semua komponen
-      combined_plot <- gridExtra::grid.arrange(
-        header_grob,
-        viz_plot,
-        interpretation_grob,
-        ncol = 1,
-        heights = c(0.8, 3, 1.5)
-      )
-      
-      ggsave(file, combined_plot, width = 12, height = 16, device = "pdf", dpi = 300)
-    }
-  )
+  
+  
   
   #--- LOGIKA UNTUK ANOVA ---#
   
@@ -1352,39 +1018,13 @@ server <- function(input, output, session) {
   output$anova1_interpretation <- renderText({
     p_value <- summary(anova1_model())[[1]][["Pr(>F)"]][1]
     if (p_value < 0.05) {
-      "Hasil ANOVA signifikan (p < 0.05), menunjukkan bahwa setidaknya ada satu kelompok yang rata-ratanya berbeda secara signifikan dari yang lain. Lihat tabel Post-Hoc untuk melihat pasangan kelompok mana yang berbeda."
+      "Hasil ANOVA signifikan karena P-value < 0.05 dan ini menunjukkan bahwa setidaknya ada satu kelompok yang rata-ratanya berbeda secara signifikan dari yang lain. Lihat tabel Post-Hoc untuk melihat pasangan kelompok mana yang berbeda."
     } else {
-      "Hasil ANOVA tidak signifikan (p >= 0.05), menunjukkan bahwa tidak ada perbedaan rata-rata yang signifikan antar kelompok."
+      "Hasil ANOVA tidak signifikan karena P-value lebih besar atau sama dengan 0.05 dan ini menunjukkan bahwa tidak ada perbedaan rata-rata yang signifikan antar kelompok."
     }
   })
   
-  output$download_anova <- downloadHandler(
-    filename = function() paste0("hasil_anova_", Sys.Date(), ".docx"),
-    content = function(file) {
-      doc <- read_docx() %>% body_add_par("Hasil Analisis Varians (ANOVA)", style = "heading 1")
-      
-      doc %>% body_add_par("ANOVA Satu Arah", style = "heading 2")
-      anova1_safe <- tryCatch({
-        df_res <- as.data.frame(summary(anova1_model())[[1]])
-        df_res <- tibble::rownames_to_column(df_res, "Sumber Variasi")
-        names(df_res)[names(df_res) == "Pr(>F)"] <- "P-value"
-        ft <- flextable(df_res) %>% colformat_double(j = 2:6, big.mark = "", digits = 4) %>% autofit() %>% theme_box()
-        doc %>% body_add_flextable(ft)
-        doc %>% body_add_par("Interpretasi:", style="heading 3") %>% body_add_par(output$anova1_interpretation())
-        
-        doc %>% body_add_par("Uji Lanjutan Tukey HSD", style="heading 3")
-        res_posthoc <- as.data.frame(anova1_posthoc_model()$Kategori)
-        res_posthoc <- tibble::rownames_to_column(res_posthoc, "Perbandingan")
-        names(res_posthoc)[names(res_posthoc) == "p adj"] <- "P-value Adjusted"
-        ft_posthoc <- flextable(res_posthoc) %>% colformat_double(j = 2:5, big.mark = "", digits = 4) %>% autofit() %>% theme_box()
-        doc %>% body_add_flextable(ft_posthoc)
-      }, error = function(e) {
-        doc %>% body_add_par(paste("Gagal menjalankan ANOVA Satu Arah:", e$message))
-      })
-      
-      print(doc, target = file)
-    }
-  )
+  
   
   # --- LOGIKA BARU UNTUK ANALISIS CLUSTERING K-MEANS --- #
   
@@ -1690,194 +1330,9 @@ server <- function(input, output, session) {
       scale_x_continuous(breaks = 2:8)
   })
   
-  # Download handler untuk clustering
-  output$download_clustering <- downloadHandler(
-    filename = function() paste0("hasil_clustering_", Sys.Date(), ".docx"),
-    content = function(file) {
-      results <- clustering_results()
-      req(results)
-      
-      doc <- read_docx() %>%
-        body_add_par("Hasil Analisis Clustering K-Means", style = "heading 1")
-      
-      # Informasi umum
-      doc %>% body_add_par("Informasi Umum", style = "heading 2")
-      doc %>% body_add_par(paste("Jumlah Cluster:", input$num_clusters))
-      doc %>% body_add_par(paste("Jumlah Observasi:", nrow(results$data)))
-      doc %>% body_add_par(paste("Variabel yang Digunakan:", paste(results$variables_used, collapse = ", ")))
-      doc %>% body_add_par(paste("Menggunakan Matriks Penimbang Jarak:", ifelse(input$use_distance_matrix, "Ya", "Tidak")))
-      
-      # Metrik validasi
-      doc %>% body_add_par("Metrik Validasi Clustering", style = "heading 2")
-      validation_data <- data.frame(
-        Metrik = c("Silhouette Score", "Within Sum of Squares", "Between Sum of Squares", 
-                   "Total Sum of Squares", "Proporsi Varians Dijelaskan (%)"),
-        Nilai = c(
-          round(results$silhouette_score, 4),
-          round(results$within_ss, 2),
-          round(results$between_ss, 2),
-          round(results$total_ss, 2),
-          round(results$between_ss / results$total_ss * 100, 2)
-        )
-      )
-      doc %>% body_add_flextable(flextable(validation_data) %>% autofit())
-      
-      # Pusat cluster
-      doc %>% body_add_par("Pusat Cluster (Standardized)", style = "heading 2")
-      centers_df <- as.data.frame(results$kmeans_result$centers)
-      centers_df <- tibble::rownames_to_column(centers_df, "Cluster")
-      doc %>% body_add_flextable(flextable(centers_df) %>% autofit())
-      
-      # Daftar wilayah per cluster
-      doc %>% body_add_par("Daftar Wilayah per Cluster", style = "heading 2")
-      region_table <- results$data %>%
-        select(all_of(c(nama_kolom_kode, nama_kolom_kabupaten, "Cluster"))) %>%
-        arrange(Cluster, !!sym(nama_kolom_kabupaten)) %>%
-        rename(
-          "Kode" = !!sym(nama_kolom_kode),
-          "Nama Wilayah" = !!sym(nama_kolom_kabupaten),
-          "Cluster" = "Cluster"
-        )
-      doc %>% body_add_flextable(flextable(region_table) %>% 
-                                   autofit() %>%
-                                   theme_box() %>%
-                                   color(~ Cluster == 1, ~ Cluster, color = "red") %>%
-                                   color(~ Cluster == 2, ~ Cluster, color = "blue") %>%
-                                   color(~ Cluster == 3, ~ Cluster, color = "green"))
-      
-      # Ringkasan jumlah wilayah per cluster
-      doc %>% body_add_par("Ringkasan Jumlah Wilayah per Cluster", style = "heading 2")
-      count_table <- results$data %>%
-        group_by(Cluster) %>%
-        summarise(
-          Jumlah_Wilayah = n(),
-          Contoh_Wilayah = paste(head(!!sym(nama_kolom_kabupaten), 3), collapse = ", "),
-          .groups = "drop"
-        ) %>%
-        arrange(Cluster)
-      doc %>% body_add_flextable(flextable(count_table) %>% autofit() %>% theme_box())
-      
-      # Interpretasi
-      doc %>% body_add_par("Interpretasi", style = "heading 2")
-      doc %>% body_add_par(output$cluster_interpretation())
-      
-      print(doc, target = file)
-    }
-  )
   
-  # Download laporan interpretasi clustering dalam format PDF
-  output$download_clustering_pdf <- downloadHandler(
-    filename = function() paste("laporan_clustering_", Sys.Date(), ".pdf", sep = ""),
-    content = function(file) {
-      results <- clustering_results()
-      req(results)
-      
-      # Header informasi
-      header_text <- paste0(
-        "LAPORAN ANALISIS CLUSTERING K-MEANS SIGABISA\n",
-        "Sistem Informasi Geospasial Ancaman Bencana berbasis Indikator Sosial\n",
-        "Tanggal: ", format(Sys.Date(), "%d %B %Y"), "\n",
-        "Jumlah Cluster: ", input$num_clusters, "\n",
-        "Variabel: ", paste(results$variables_used, collapse = ", "), "\n",
-        "Jumlah Observasi: ", nrow(results$data), "\n",
-        paste(rep("=", 80), collapse = "")
-      )
-      
-      header_grob <- gridExtra::tableGrob(
-        data.frame(Header = header_text),
-        theme = gridExtra::ttheme_minimal(
-          base_size = 12,
-          core = list(fg_params = list(hjust = 0, x = 0.02)),
-          colhead = list(fg_params = list(hjust = 0, x = 0.02))
-        ),
-        rows = NULL, cols = NULL
-      )
-      
-      # Interpretasi
-      interpretasi_text <- output$cluster_interpretation()
-      interpretation_lines <- unlist(strsplit(interpretasi_text, "\n"))
-      interpretation_formatted <- data.frame(
-        Interpretasi = interpretation_lines[interpretation_lines != ""]
-      )
-      
-      interpretation_grob <- gridExtra::tableGrob(
-        interpretation_formatted,
-        theme = gridExtra::ttheme_minimal(
-          base_size = 10,
-          core = list(
-            fg_params = list(hjust = 0, x = 0.02),
-            bg_params = list(fill = "white")
-          ),
-          colhead = list(
-            fg_params = list(hjust = 0, x = 0.02, fontface = "bold"),
-            bg_params = list(fill = "lightgray")
-          )
-        ),
-        rows = NULL
-      )
-      
-      # Buat plot clustering (PCA atau scatter plot)
-      if (length(results$variables_used) >= 2) {
-        if (length(results$variables_used) > 2) {
-          # Gunakan PCA untuk visualisasi
-          pca_result <- prcomp(results$scaled_data, scale. = FALSE)
-          plot_data <- data.frame(
-            PC1 = pca_result$x[, 1],
-            PC2 = pca_result$x[, 2],
-            Cluster = as.factor(results$kmeans_result$cluster)
-          )
-          
-          viz_plot <- ggplot(plot_data, aes(x = PC1, y = PC2, color = Cluster)) +
-            geom_point(size = 3, alpha = 0.7) +
-            labs(title = "Hasil Clustering (PCA Plot)",
-                 x = paste0("PC1 (", round(summary(pca_result)$importance[2,1] * 100, 1), "% variance)"),
-                 y = paste0("PC2 (", round(summary(pca_result)$importance[2,2] * 100, 1), "% variance)")) +
-            theme_minimal() +
-            scale_color_brewer(type = "qual", palette = "Set1")
-        } else {
-          # Scatter plot untuk 2 variabel
-          plot_data <- data.frame(
-            x = results$scaled_data[, 1],
-            y = results$scaled_data[, 2],
-            Cluster = as.factor(results$kmeans_result$cluster)
-          )
-          
-          viz_plot <- ggplot(plot_data, aes(x = x, y = y, color = Cluster)) +
-            geom_point(size = 3, alpha = 0.7) +
-            labs(title = "Hasil Clustering",
-                 x = results$variables_used[1],
-                 y = results$variables_used[2]) +
-            theme_minimal() +
-            scale_color_brewer(type = "qual", palette = "Set1")
-        }
-      } else {
-        # Plot sederhana untuk 1 variabel
-        plot_data <- data.frame(
-          Variable = results$scaled_data[, 1],
-          Cluster = as.factor(results$kmeans_result$cluster),
-          Index = 1:nrow(results$scaled_data)
-        )
-        
-        viz_plot <- ggplot(plot_data, aes(x = Index, y = Variable, color = Cluster)) +
-          geom_point(size = 3, alpha = 0.7) +
-          labs(title = "Hasil Clustering",
-               x = "Index", y = results$variables_used[1]) +
-          theme_minimal() +
-          scale_color_brewer(type = "qual", palette = "Set1")
-      }
-      
-      # Gabungkan semua komponen
-      combined_plot <- gridExtra::grid.arrange(
-        header_grob,
-        viz_plot,
-        interpretation_grob,
-        ncol = 1,
-        heights = c(0.8, 3, 1.5)
-      )
-      
-      ggsave(file, combined_plot, width = 12, height = 16, device = "pdf", dpi = 300)
-    }
-  )
+  
+  
   
   # --- LOGIKA BARU UNTUK REGRESI LINEAR BERGANDA --- #
   
@@ -1955,7 +1410,7 @@ server <- function(input, output, session) {
     req(test_result)
     if (!is.null(test_result$error)) return("")
     p_value <- test_result$p.value
-    if (p_value > 0.05) paste0("Kesimpulan: P-value (", round(p_value, 4), ") > 0.05, maka residual berdistribusi normal.") else paste0("Kesimpulan: P-value (", round(p_value, 4), ") <= 0.05, maka residual tidak berdistribusi normal.")
+    if (p_value > 0.05) paste0("Kesimpulan: P-value = ", round(p_value, 4), " dan bernilai lebih besar daripada 0.05 sehingga residual berdistribusi normal.") else paste0("Kesimpulan: P-value = ", round(p_value, 4), " dan bernilai lebih kecil atau sama dengan 0.05 sehingga residual tidak berdistribusi normal.")
   })
   
   # 2. Autokorelasi
@@ -1980,7 +1435,7 @@ server <- function(input, output, session) {
     } else {
       "tidak ada bukti kuat adanya autokorelasi (asumsi terpenuhi)."
     }
-    paste0("Kesimpulan: P-value (", round(p_value, 4), ") dan statistik DW (", round(dw_stat, 2), ") menunjukkan bahwa ", kesimpulan)
+    paste0("Kesimpulan: P-value = ", round(p_value, 4), " dan nilai statistik DW = ", round(dw_stat, 2), " sehingga menunjukkan bahwa ", kesimpulan)
   })
   
   # 3. Multikolinearitas
@@ -2011,7 +1466,7 @@ server <- function(input, output, session) {
     if (any(vif_df$VIF > 10)) {
       "Kesimpulan: Ditemukan setidaknya satu variabel dengan VIF > 10, mengindikasikan adanya masalah multikolinearitas yang serius."
     } else {
-      "Kesimpulan: Semua variabel memiliki nilai VIF di bawah 10, menunjukkan tidak ada masalah multikolinearitas yang serius (asumsi terpenuhi)."
+      "Kesimpulan: Semua variabel memiliki nilai VIF di bawah 10, menunjukkan tidak ada masalah multikolinearitas yang serius (asumsi non multikolinearitas terpenuhi)."
     }
   })
   
@@ -2030,59 +1485,13 @@ server <- function(input, output, session) {
     req(test)
     p_value <- test$p.value
     if (p_value > 0.05) {
-      paste0("Kesimpulan: P-value (", round(p_value, 4), ") > 0.05, maka tidak ada bukti adanya heteroskedastisitas (varian residual homogen/asumsi terpenuhi).")
+      paste0("Kesimpulan: P-value = ", round(p_value, 4), " dan nilainya lebih besar dibanding 0.05, maka tidak ada bukti adanya heteroskedastisitas (varian residual homogen/asumsi homoskedastisitas terpenuhi).")
     } else {
-      paste0("Kesimpulan: P-value (", round(p_value, 4), ") <= 0.05, maka terindikasi adanya masalah heteroskedastisitas (varian residual tidak homogen).")
+      paste0("Kesimpulan: P-value = ", round(p_value, 4), "dan nilainya lebih kecil atau sama dengan 0.05, maka terindikasi adanya masalah heteroskedastisitas (varian residual tidak homogen/asumsi homoskedastisitas terlanggar).")
     }
   })
   
-  # Download Handler untuk Regresi
-  output$download_regresi <- downloadHandler(
-    filename = function() paste0("hasil_regresi_", Sys.Date(), ".docx"),
-    content = function(file) {
-      doc <- read_docx() %>% 
-        body_add_par("Hasil Analisis Regresi Linear Berganda", style = "heading 1")
-      
-      # Hasil Model
-      doc %>% body_add_par("Ringkasan Model Regresi", style = "heading 2")
-      model <- reg_model_reactive()
-      if (!is.null(model)) {
-        doc %>% body_add_par(paste(capture.output(summary(model)), collapse = "\n"))
-      } else {
-        doc %>% body_add_par("Model belum dijalankan atau gagal.")
-      }
-      
-      # Uji Asumsi
-      doc %>% body_add_par("Hasil Uji Asumsi Klasik", style = "heading 1")
-      
-      # Normalitas
-      doc %>% body_add_par("1. Uji Normalitas Residual", style = "heading 2")
-      doc %>% body_add_par(paste(capture.output(reg_norm_test_output()), collapse = "\n"))
-      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$reg_norm_test_interpretation())
-      
-      # Autokorelasi
-      doc %>% body_add_par("2. Uji Autokorelasi (Durbin-Watson)", style = "heading 2")
-      doc %>% body_add_par(paste(capture.output(autokorelasi_test()), collapse = "\n"))
-      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$autokorelasi_test_interpretation())
-      
-      # Multikolinearitas
-      doc %>% body_add_par("3. Uji Multikolinearitas (VIF)", style = "heading 2")
-      vif_df <- multikolinearitas_test()
-      if (!is.null(vif_df)) {
-        doc %>% body_add_flextable(flextable(vif_df) %>% autofit())
-        doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$multikolinearitas_test_interpretation())
-      } else {
-        doc %>% body_add_par("Tidak dapat melakukan uji VIF (memerlukan min. 2 variabel independen).")
-      }
-      
-      # Homoskedastisitas
-      doc %>% body_add_par("4. Uji Homoskedastisitas (Breusch-Pagan)", style = "heading 2")
-      doc %>% body_add_par(paste(capture.output(homoskedastisitas_test()), collapse = "\n"))
-      doc %>% body_add_par("Interpretasi:", style = "heading 3") %>% body_add_par(output$homoskedastisitas_test_interpretation())
-      
-      print(doc, target = file)
-    }
-  )
+  
   
   
   #--- LOGIKA UNTUK EKSPLORASI DATA ---#
@@ -2172,29 +1581,7 @@ server <- function(input, output, session) {
       theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16), legend.position = "bottom", legend.key.width = unit(1.5, "cm"))
   }, res = 96)
   
-  output$unduh_laporan <- downloadHandler(
-    filename = function() paste0("eksplorasi_", input$variabel_eksplorasi, ".docx"),
-    content = function(file) {
-      req(input$variabel_eksplorasi)
-      data <- data_sosial()[[input$variabel_eksplorasi]]
-      modus <- as.numeric(names(sort(table(data), decreasing = TRUE)[1]))
-      stats_df <- data.frame(
-        Statistik = c("Mean", "Median", "Modus", "Min", "Max", "Range", "SD"),
-        Nilai = as.character(round(c(mean(data, na.rm = TRUE), median(data, na.rm = TRUE), modus, min(data, na.rm = TRUE), max(data, na.rm = TRUE), diff(range(data, na.rm = TRUE)), sd(data, na.rm = TRUE)), 2))
-      )
-      doc <- read_docx() %>% body_add_par(paste("Laporan Eksplorasi Variabel:", input$variabel_eksplorasi), style = "heading 1")
-      doc %>% body_add_flextable(flextable(stats_df))
-      doc %>% body_add_par("Interpretasi:", style = "heading 2") %>% body_add_par(output$interpretasi_stat())
-      print(doc, target = file)
-    }
-  )
   
-  output$unduh_gabungan <- downloadHandler(
-    filename = function() "gabungan_eksplorasi.pdf",
-    content = function(file) {
-      writeLines("Fitur unduh gabungan akan segera dikembangkan.", file)
-    }
-  )
 }
 
 #================================================================#
