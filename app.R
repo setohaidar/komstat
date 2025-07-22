@@ -36,6 +36,7 @@ ui <- dashboardPage(
     sidebarMenu(
       menuItem("Beranda", tabName = "beranda", icon = icon("home")),
       menuItem("Manajemen Data", tabName = "manajemen_data", icon = icon("database")),
+      menuItem("Eksplorasi Data", tabName = "eksplorasi_data", icon = icon("chart-bar")),
       menuItem("Uji Asumsi", tabName = "uji_asumsi", icon = icon("flask")),
       menuItem("Uji Beda Rata-rata", tabName = "uji_rata", icon = icon("balance-scale")),
       menuItem("Uji Varians", tabName = "uji_varians", icon = icon("chart-area")),
@@ -43,8 +44,7 @@ ui <- dashboardPage(
       menuItem("ANOVA (>2 Kelompok)", tabName = "anova", icon = icon("braille")),
       # --- MENU BARU DITAMBAHKAN DI SINI --- #
       menuItem("Regresi Linear Berganda", tabName = "regresi", icon = icon("line-chart")),
-      menuItem("Analisis Clustering K-Means", tabName = "clustering", icon = icon("project-diagram")),
-      menuItem("Eksplorasi Data", tabName = "eksplorasi_data", icon = icon("chart-bar"))
+      menuItem("Analisis Clustering K-Means", tabName = "clustering", icon = icon("project-diagram"))
     )
   ),
   dashboardBody(
