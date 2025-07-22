@@ -3,7 +3,7 @@
 #----------------------------------------------------------------#
 
 # 1. PASTIKAN SEMUA LIBRARY INI SUDAH TERINSTALL
-# install.packages(c("shiny", "shinydashboard", "readxl", "DT", "officer", "flextable", "ggplot2", "dplyr", "sf", "leaflet", "car", "nortest", "EnvStats", "lmtest", "cluster", "spdep"))
+# install.packages(c("shiny", "shinydashboard", "readxl", "DT", "officer", "flextable", "ggplot2", "dplyr", "sf", "leaflet", "car", "nortest", "EnvStats", "lmtest", "cluster"))
 
 library(shiny)
 library(shinydashboard)
@@ -20,7 +20,6 @@ library(nortest)
 library(EnvStats) 
 library(lmtest) # Ditambahkan untuk uji asumsi regresi
 library(cluster) # Untuk clustering analysis
-library(spdep) # Untuk analisis spasial dan Moran's I
 
 #================================================================#
 #                           UI (USER INTERFACE)                  #
@@ -397,23 +396,10 @@ ui <- dashboardPage(
                   title = "Pengaturan Analisis", width = 4, solidHeader = TRUE, status = "primary",
                   h4("1. Pilih Variabel"),
                   uiOutput("cluster_var_selector_simple"),
-                  helpText("Pilih satu variabel untuk analisis clustering dan autokorelasi spasial."),
+                  helpText("Pilih satu variabel untuk analisis clustering."),
                   
                   hr(),
-                  h4("2. Matriks Pembobot Jarak"),
-                  selectInput("weight_method", "Metode Pembobot:",
-                              choices = c("Inverse Distance (1/d)" = "inverse",
-                                        "Inverse Distance Squared (1/d²)" = "inverse_squared",
-                                        "Exponential Decay" = "exponential"),
-                              selected = "inverse"),
-                  
-                  conditionalPanel(
-                    condition = "input.weight_method == 'exponential'",
-                    numericInput("decay_param", "Parameter Decay (α):", value = 0.1, min = 0.01, max = 1, step = 0.01)
-                  ),
-                  
-                  hr(),
-                  h4("3. K-Means Clustering"),
+                  h4("2. K-Means Clustering"),
                   numericInput("k_clusters", "Jumlah Cluster (K):", value = 3, min = 2, max = 8, step = 1),
                   
                   hr(),
@@ -438,23 +424,8 @@ ui <- dashboardPage(
               
               fluidRow(
                 box(
-                  title = "Indeks Moran I (Autokorelasi Spasial)", width = 6, solidHeader = TRUE, status = "info",
-                  verbatimTextOutput("moran_i_result"),
-                  hr(),
-                  h5("Interpretasi:", style = "font-weight:bold;"),
-                  textOutput("moran_i_interpretation")
-                ),
-                
-                box(
-                  title = "Visualisasi K-Means Clustering", width = 6, solidHeader = TRUE, status = "info",
+                  title = "Visualisasi K-Means Clustering", width = 12, solidHeader = TRUE, status = "info",
                   plotOutput("simple_cluster_plot", height = "400px")
-                )
-              ),
-              
-              fluidRow(
-                box(
-                  title = "Peta Hasil Clustering", width = 12, solidHeader = TRUE, status = "success",
-                  plotOutput("cluster_map", height = "500px")
                 )
               )
       ),
@@ -1453,50 +1424,7 @@ server <- function(input, output, session) {
                 choices = kolom_numerik, selected = kolom_numerik[1])
   })
   
-  # Reactive untuk matriks pembobot berdasarkan jarak spasial
-  spatial_weights <- reactive({
-    req(geojson_data())
-    
-    # Dapatkan centroid dari setiap polygon
-    geom_data <- geojson_data()
-    centroids <- st_centroid(geom_data)
-    coords <- st_coordinates(centroids)
-    
-    # Hitung matriks jarak euclidean
-    dist_matrix <- as.matrix(dist(coords))
-    
-    # Buat matriks pembobot berdasarkan jarak
-    n <- nrow(dist_matrix)
-    weight_matrix <- matrix(0, n, n)
-    
-    for(i in 1:n) {
-      for(j in 1:n) {
-        if(i != j) {
-          d <- dist_matrix[i, j]
-          if(d > 0) {
-            if(input$weight_method == "inverse") {
-              weight_matrix[i, j] <- 1/d
-            } else if(input$weight_method == "inverse_squared") {
-              weight_matrix[i, j] <- 1/(d^2)
-            } else if(input$weight_method == "exponential") {
-              req(input$decay_param)
-              weight_matrix[i, j] <- exp(-input$decay_param * d)
-            }
-          }
-        }
-      }
-    }
-    
-    # Normalisasi baris (row-standardized)
-    row_sums <- rowSums(weight_matrix)
-    for(i in 1:n) {
-      if(row_sums[i] > 0) {
-        weight_matrix[i, ] <- weight_matrix[i, ] / row_sums[i]
-      }
-    }
-    
-    return(weight_matrix)
-  })
+
   
   # Reactive untuk hasil analisis
   simple_analysis_results <- eventReactive(input$run_simple_analysis, {
@@ -1518,36 +1446,17 @@ server <- function(input, output, session) {
     set.seed(123)
     kmeans_result <- kmeans(scaled_data, centers = input$k_clusters, nstart = 25)
     
-    # Gabungkan hasil
-    result_df <- clean_df
-    result_df$Cluster <- as.factor(kmeans_result$cluster)
-    result_df$Scaled_Value <- scaled_data
-    
-    # Hitung Moran's I jika ada data spasial
-    moran_result <- NULL
-    if(nrow(result_df) > 5) {
-      tryCatch({
-        # Buat spatial weights list dari matriks
-        weight_mat <- spatial_weights()[complete_idx, complete_idx]
-        
-        # Konversi ke listw object
-        nb_list <- mat2listw(weight_mat, style = "W", zero.policy = TRUE)
-        
-        # Hitung Moran's I
-        moran_result <- moran.test(clean_data, nb_list, zero.policy = TRUE)
-      }, error = function(e) {
-        moran_result <<- NULL
-      })
-    }
-    
-    return(list(
-      data = result_df,
-      kmeans = kmeans_result,
-      moran = moran_result,
-      variable = input$cluster_variable,
-      weight_method = input$weight_method,
-      k = input$k_clusters
-    ))
+         # Gabungkan hasil
+     result_df <- clean_df
+     result_df$Cluster <- as.factor(kmeans_result$cluster)
+     result_df$Scaled_Value <- scaled_data
+     
+     return(list(
+       data = result_df,
+       kmeans = kmeans_result,
+       variable = input$cluster_variable,
+       k = input$k_clusters
+     ))
   })
   
   # Output ringkasan analisis
@@ -1555,12 +1464,8 @@ server <- function(input, output, session) {
     results <- simple_analysis_results()
     req(results)
     
-    cat("=== ANALISIS CLUSTERING DAN AUTOKORELASI SPASIAL ===\n\n")
-    cat("Variabel Analisis:", results$variable, "\n")
-    cat("Metode Pembobot:", switch(results$weight_method,
-                                  "inverse" = "Inverse Distance (1/d)",
-                                  "inverse_squared" = "Inverse Distance Squared (1/d²)",
-                                  "exponential" = "Exponential Decay"), "\n")
+         cat("=== ANALISIS K-MEANS CLUSTERING ===\n\n")
+     cat("Variabel Analisis:", results$variable, "\n")
     cat("Jumlah Cluster (K):", results$k, "\n")
     cat("Jumlah Observasi:", nrow(results$data), "\n\n")
     
@@ -1603,47 +1508,7 @@ server <- function(input, output, session) {
       formatRound(columns = results$variable, digits = 2)
   })
   
-  # Moran's I hasil dan interpretasi
-  output$moran_i_result <- renderPrint({
-    results <- simple_analysis_results()
-    req(results)
-    
-    if(!is.null(results$moran)) {
-      cat("=== UJI MORAN'S I ===\n\n")
-      cat("Moran's I Statistic:", round(results$moran$estimate[1], 4), "\n")
-      cat("Expected Value:", round(results$moran$estimate[2], 4), "\n")
-      cat("Variance:", round(results$moran$estimate[3], 6), "\n")
-      cat("Z-Score:", round(results$moran$statistic, 4), "\n")
-      cat("P-value:", round(results$moran$p.value, 6), "\n")
-    } else {
-      cat("Moran's I tidak dapat dihitung.\nKemungkinan penyebab: data spasial tidak lengkap atau jumlah observasi terlalu sedikit.")
-    }
-  })
   
-  output$moran_i_interpretation <- renderText({
-    results <- simple_analysis_results()
-    req(results)
-    
-    if(!is.null(results$moran)) {
-      moran_i <- results$moran$estimate[1]
-      p_value <- results$moran$p.value
-      
-      if(p_value < 0.05) {
-        if(moran_i > 0) {
-          paste0("Terdapat autokorelasi spasial positif yang signifikan (Moran's I = ", 
-                round(moran_i, 4), ", p < 0.05). Kabupaten/kota dengan nilai tinggi cenderung bertetangga dengan yang bernilai tinggi, begitu juga sebaliknya.")
-        } else {
-          paste0("Terdapat autokorelasi spasial negatif yang signifikan (Moran's I = ", 
-                round(moran_i, 4), ", p < 0.05). Kabupaten/kota dengan nilai tinggi cenderung bertetangga dengan yang bernilai rendah.")
-        }
-      } else {
-        paste0("Tidak terdapat autokorelasi spasial yang signifikan (Moran's I = ", 
-              round(moran_i, 4), ", p = ", round(p_value, 4), "). Distribusi nilai bersifat acak secara spasial.")
-      }
-    } else {
-      "Interpretasi tidak dapat diberikan karena Moran's I tidak dapat dihitung."
-    }
-  })
   
   # Plot clustering sederhana
   output$simple_cluster_plot <- renderPlot({
@@ -1667,45 +1532,23 @@ server <- function(input, output, session) {
             legend.position = "none")
   })
   
-  # Peta hasil clustering
-  output$cluster_map <- renderPlot({
-    results <- simple_analysis_results()
-    req(results, geojson_data())
-    
-    # Gabungkan hasil dengan data spasial
-    geom_data <- geojson_data()
-    map_data <- merge(geom_data, 
-                     results$data[, c(nama_kolom_kode, "Cluster")], 
-                     by = nama_kolom_kode, all.x = TRUE)
-    
-    ggplot(map_data) +
-      geom_sf(aes(fill = Cluster), color = "white", size = 0.3) +
-      scale_fill_discrete(name = "Cluster", na.value = "grey90") +
-      labs(title = paste("Peta Hasil K-Means Clustering\nVariabel:", gsub("_", " ", results$variable))) +
-      theme_void() +
-      theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
-            legend.position = "bottom")
-  })
+  
   
   # Download handler
   output$download_simple_results <- downloadHandler(
-    filename = function() paste0("hasil_clustering_sederhana_", Sys.Date(), ".docx"),
+         filename = function() paste0("hasil_kmeans_clustering_", Sys.Date(), ".docx"),
     content = function(file) {
       results <- simple_analysis_results()
       req(results)
       
-      doc <- read_docx() %>% 
-        body_add_par("Hasil Analisis Clustering dengan Matriks Pembobot Jarak", style = "heading 1")
+             doc <- read_docx() %>% 
+         body_add_par("Hasil Analisis K-Means Clustering", style = "heading 1")
       
-      # Informasi umum
-      doc %>% body_add_par("Informasi Umum", style = "heading 2")
-      doc %>% body_add_par(paste("Variabel Analisis:", results$variable))
-      doc %>% body_add_par(paste("Metode Pembobot:", switch(results$weight_method,
-                                                           "inverse" = "Inverse Distance (1/d)",
-                                                           "inverse_squared" = "Inverse Distance Squared (1/d²)",
-                                                           "exponential" = "Exponential Decay")))
-      doc %>% body_add_par(paste("Jumlah Cluster (K):", results$k))
-      doc %>% body_add_par(paste("Jumlah Observasi:", nrow(results$data)))
+             # Informasi umum
+       doc %>% body_add_par("Informasi Umum", style = "heading 2")
+       doc %>% body_add_par(paste("Variabel Analisis:", results$variable))
+       doc %>% body_add_par(paste("Jumlah Cluster (K):", results$k))
+       doc %>% body_add_par(paste("Jumlah Observasi:", nrow(results$data)))
       
       # Hasil K-Means
       doc %>% body_add_par("Hasil K-Means Clustering", style = "heading 2")
@@ -1713,42 +1556,7 @@ server <- function(input, output, session) {
       names(cluster_dist) <- c("Cluster", "Jumlah_Kabupaten_Kota")
       doc %>% body_add_flextable(flextable(cluster_dist) %>% autofit())
       
-      doc %>% body_add_par(paste("BSS/TSS Ratio:", round(results$kmeans$betweenss/results$kmeans$totss, 4)))
-      
-      # Moran's I
-      doc %>% body_add_par("Hasil Uji Moran's I", style = "heading 2")
-      if(!is.null(results$moran)) {
-        moran_table <- data.frame(
-          Statistik = c("Moran's I", "Expected Value", "Z-Score", "P-value"),
-          Nilai = c(round(results$moran$estimate[1], 4),
-                   round(results$moran$estimate[2], 4),
-                   round(results$moran$statistic, 4),
-                   round(results$moran$p.value, 6))
-        )
-        doc %>% body_add_flextable(flextable(moran_table) %>% autofit())
-        doc %>% body_add_par("Interpretasi:", style = "heading 3")
-        
-        # Buat interpretasi Moran's I secara langsung
-        moran_i <- results$moran$estimate[1]
-        p_value <- results$moran$p.value
-        
-        if(p_value < 0.05) {
-          if(moran_i > 0) {
-            interpretasi_moran <- paste0("Terdapat autokorelasi spasial positif yang signifikan (Moran's I = ", 
-                   round(moran_i, 4), ", p < 0.05). Kabupaten/kota dengan nilai tinggi cenderung bertetangga dengan yang bernilai tinggi, begitu juga sebaliknya.")
-          } else {
-            interpretasi_moran <- paste0("Terdapat autokorelasi spasial negatif yang signifikan (Moran's I = ", 
-                   round(moran_i, 4), ", p < 0.05). Kabupaten/kota dengan nilai tinggi cenderung bertetangga dengan yang bernilai rendah.")
-          }
-        } else {
-          interpretasi_moran <- paste0("Tidak terdapat autokorelasi spasial yang signifikan (Moran's I = ", 
-                 round(moran_i, 4), ", p = ", round(p_value, 4), "). Distribusi nilai bersifat acak secara spasial.")
-        }
-        
-        doc %>% body_add_par(interpretasi_moran)
-      } else {
-        doc %>% body_add_par("Moran's I tidak dapat dihitung karena keterbatasan data spasial.")
-      }
+             doc %>% body_add_par(paste("BSS/TSS Ratio:", round(results$kmeans$betweenss/results$kmeans$totss, 4)))
       
       # Tabel hasil
       doc %>% body_add_par("Tabel Hasil Clustering", style = "heading 2")
