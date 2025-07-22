@@ -103,6 +103,11 @@ ui <- dashboardPage(
           color: #2c3e50;
         }
         
+        /* Styling untuk judul pengujian */
+        h4, h5 {
+          color: white !important;
+        }
+        
         /* Styling untuk verbatim output */
         pre {
           background-color: #f8f9fa;
@@ -320,7 +325,7 @@ ui <- dashboardPage(
                            verbatimTextOutput("homog_test_result"),
                            hr(),
                            h5("Interpretasi:", style = "font-weight:bold;"),
-                           textOutput("homog_test_interpretation")
+                           htmlOutput("homog_test_interpretation")
                     )
                   )
                 )
@@ -914,23 +919,27 @@ server <- function(input, output, session) {
     
     if (is.na(p_value)) return("Tidak dapat mengambil P-value.")
     
-    # Interpretasi berdasarkan p-value
+    # Interpretasi berdasarkan p-value dengan HTML formatting
+    significance_class <- if (p_value > 0.05) "not-significant" else "significant"
+    
     if (p_value > 0.05) {
-      paste0("HASIL UJI HOMOGENITAS VARIAN (Levene's Test):\n",
-             "Statistik F = ", round(f_value, 4), "\n",
-             "Derajat bebas = ", df1, ", ", df2, "\n",
-             "P-value = ", round(p_value, 4), "\n\n",
-             "INTERPRETASI:\n",
-             "Karena P-value (", round(p_value, 4), ") > α (0.05), maka H₀ diterima.\n",
-             "KESIMPULAN: Varian antar kelompok adalah homogen (sama) pada tingkat signifikansi 5%.")
+      div(class = significance_class,
+          HTML(paste0("<strong>HASIL UJI HOMOGENITAS VARIAN (Levene's Test):</strong><br/>",
+                      "Statistik F = ", round(f_value, 4), "<br/>",
+                      "Derajat bebas = ", df1, ", ", df2, "<br/>",
+                      "<strong>P-value = ", round(p_value, 4), "</strong><br/><br/>",
+                      "<strong>INTERPRETASI:</strong><br/>",
+                      "Karena P-value (", round(p_value, 4), ") > α (0.05), maka H₀ diterima.<br/>",
+                      "<strong>KESIMPULAN:</strong> Varian antar kelompok adalah homogen (sama) pada tingkat signifikansi 5%.")))
     } else {
-      paste0("HASIL UJI HOMOGENITAS VARIAN (Levene's Test):\n",
-             "Statistik F = ", round(f_value, 4), "\n",
-             "Derajat bebas = ", df1, ", ", df2, "\n",
-             "P-value = ", round(p_value, 4), "\n\n",
-             "INTERPRETASI:\n",
-             "Karena P-value (", round(p_value, 4), ") ≤ α (0.05), maka H₀ ditolak.\n",
-             "KESIMPULAN: Varian antar kelompok tidak homogen (berbeda) pada tingkat signifikansi 5%.")
+      div(class = significance_class,
+          HTML(paste0("<strong>HASIL UJI HOMOGENITAS VARIAN (Levene's Test):</strong><br/>",
+                      "Statistik F = ", round(f_value, 4), "<br/>",
+                      "Derajat bebas = ", df1, ", ", df2, "<br/>",
+                      "<strong>P-value = ", round(p_value, 4), "</strong><br/><br/>",
+                      "<strong>INTERPRETASI:</strong><br/>",
+                      "Karena P-value (", round(p_value, 4), ") ≤ α (0.05), maka H₀ ditolak.<br/>",
+                      "<strong>KESIMPULAN:</strong> Varian antar kelompok tidak homogen (berbeda) pada tingkat signifikansi 5%.")))
     }
   })
   
