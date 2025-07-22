@@ -24,7 +24,7 @@ library(factoextra) # Untuk visualisasi clustering
 library(fpc) # Untuk validasi clustering
 library(scales) # Untuk formatting dalam plot
 library(writexl) # Untuk export Excel
-library(rmarkdown) # Untuk render PDF
+library(gridExtra) # Untuk layout PDF
 
 #================================================================#
 #                           UI (USER INTERFACE)                  #
@@ -89,11 +89,7 @@ ui <- dashboardPage(
                       downloadButton("download_data_csv", "Data (CSV)", class = "btn-primary btn-sm", style = "margin-right: 5px;"),
                       downloadButton("download_data_excel", "Data (Excel)", class = "btn-success btn-sm")
                   ),
-                  div(style = "margin-bottom: 10px;",
-                      downloadButton("download_interpretasi_txt", "Interpretasi (TXT)", class = "btn-info btn-sm", style = "margin-right: 5px;"),
-                      downloadButton("download_interpretasi_word", "Interpretasi (Word)", class = "btn-warning btn-sm")
-                  ),
-                  downloadButton("download_laporan_lengkap", "Laporan Lengkap (PDF)", class = "btn-danger btn-sm")
+                  downloadButton("download_manajemen_pdf", "Laporan Interpretasi (PDF)", class = "btn-danger btn-sm")
                 ),
                 box(
                   title = "Hasil Kategorisasi Data",
@@ -315,7 +311,9 @@ ui <- dashboardPage(
               ),
               fluidRow(
                 box(title = "Unduh Hasil", width = 12,
-                    downloadButton("download_uji_proporsi", "Unduh Hasil Uji Proporsi (Word)")
+                    downloadButton("download_uji_proporsi", "Unduh Hasil Uji Proporsi (Word)"),
+                    br(), br(),
+                    downloadButton("download_proporsi_pdf", "Laporan Interpretasi (PDF)", class = "btn-danger")
                 )
               )
       ),
@@ -372,7 +370,9 @@ ui <- dashboardPage(
                   
                   hr(),
                   h4("Unduh Hasil"),
-                  downloadButton("download_clustering", "Unduh Hasil Clustering (Word)")
+                  downloadButton("download_clustering", "Unduh Hasil Clustering (Word)"),
+                  br(), br(),
+                  downloadButton("download_clustering_pdf", "Laporan Interpretasi (PDF)", class = "btn-danger")
                 ),
                 box(
                   title = "Hasil Clustering", width = 8, solidHeader = TRUE, status = "primary",
@@ -703,205 +703,86 @@ server <- function(input, output, session) {
     }
   )
   
-  # Download interpretasi dalam format TXT
-  output$download_interpretasi_txt <- downloadHandler(
-    filename = function() {
-      paste0("interpretasi_", gsub("[^A-Za-z0-9]", "_", input$variabel), "_", Sys.Date(), ".txt")
-    },
+  # Download laporan interpretasi dalam format PDF
+  output$download_manajemen_pdf <- downloadHandler(
+    filename = function() paste("laporan_kategorisasi_", gsub("[^A-Za-z0-9]", "_", input$variabel), "_", Sys.Date(), ".pdf", sep = ""),
     content = function(file) {
-      interpretasi_text <- output$interpretasi_output()
+      req(input$variabel)
       
-      # Tambahkan header informasi
-      full_text <- paste0(
-        "=== LAPORAN KATEGORISASI DATA ===\n",
-        "Tanggal: ", Sys.Date(), "\n",
-        "Waktu: ", Sys.time(), "\n",
+      # Header informasi
+      header_text <- paste0(
+        "LAPORAN KATEGORISASI DATA SIGABISA\n",
+        "Sistem Informasi Geospasial Ancaman Bencana berbasis Indikator Sosial\n",
+        "Tanggal: ", format(Sys.Date(), "%d %B %Y"), "\n",
         "Variabel: ", input$variabel, "\n",
-        "Jumlah Kategori: ", input$jumlah_kategori, "\n\n",
-        interpretasi_text, "\n\n",
-        "=== STATISTIK DESKRIPTIF ===\n"
+        "Jumlah Kategori: ", input$jumlah_kategori, "\n",
+        "Metode: Equal Interval\n",
+        paste(rep("=", 80), collapse = "")
       )
       
-      # Tambahkan statistik deskriptif
-      info <- kategori_info()
-      data_original <- data_sosial()[[input$variabel]]
-      stats_text <- paste0(
-        "Jumlah Data: ", length(data_original), "\n",
-        "Nilai Minimum: ", round(min(data_original, na.rm = TRUE), 3), "\n",
-        "Nilai Maksimum: ", round(max(data_original, na.rm = TRUE), 3), "\n",
-        "Rata-rata: ", round(mean(data_original, na.rm = TRUE), 3), "\n",
-        "Median: ", round(median(data_original, na.rm = TRUE), 3), "\n",
-        "Standar Deviasi: ", round(sd(data_original, na.rm = TRUE), 3), "\n\n",
-        "=== DISTRIBUSI PER KATEGORI ===\n"
+      header_grob <- gridExtra::tableGrob(
+        data.frame(Header = header_text),
+        theme = gridExtra::ttheme_minimal(
+          base_size = 12,
+          core = list(fg_params = list(hjust = 0, x = 0.02)),
+          colhead = list(fg_params = list(hjust = 0, x = 0.02))
+        ),
+        rows = NULL, cols = NULL
       )
-      
-      # Tambahkan distribusi per kategori
-      kategori_counts <- table(info$data$Kategori)
-      distribusi_text <- ""
-      for (i in 1:length(kategori_counts)) {
-        nama_kategori <- names(kategori_counts)[i]
-        jumlah <- kategori_counts[i]
-        persentase <- round(jumlah / sum(kategori_counts) * 100, 1)
-        distribusi_text <- paste0(distribusi_text, 
-                                nama_kategori, ": ", jumlah, " observasi (", persentase, "%)\n")
-      }
-      
-      final_text <- paste0(full_text, stats_text, distribusi_text)
-      writeLines(final_text, file, useBytes = TRUE)
-    }
-  )
-  
-  # Download interpretasi dalam format Word
-  output$download_interpretasi_word <- downloadHandler(
-    filename = function() {
-      paste0("interpretasi_", gsub("[^A-Za-z0-9]", "_", input$variabel), "_", Sys.Date(), ".docx")
-    },
-    content = function(file) {
-      doc <- read_docx() %>%
-        body_add_par("Laporan Kategorisasi Data", style = "heading 1")
-      
-      # Informasi umum
-      doc %>% body_add_par("Informasi Umum", style = "heading 2")
-      doc %>% body_add_par(paste("Tanggal:", Sys.Date()))
-      doc %>% body_add_par(paste("Variabel:", input$variabel))
-      doc %>% body_add_par(paste("Jumlah Kategori:", input$jumlah_kategori))
-      doc %>% body_add_par(paste("Metode:", "Equal Interval"))
       
       # Interpretasi
-      doc %>% body_add_par("Interpretasi", style = "heading 2")
-      interpretasi_lines <- strsplit(output$interpretasi_output(), "\n")[[1]]
-      for (line in interpretasi_lines) {
-        if (nchar(line) > 0) {
-          doc %>% body_add_par(line)
-        }
-      }
-      
-      # Statistik deskriptif
-      doc %>% body_add_par("Statistik Deskriptif", style = "heading 2")
-      data_original <- data_sosial()[[input$variabel]]
-      stats_table <- data.frame(
-        Statistik = c("Jumlah Data", "Nilai Minimum", "Nilai Maksimum", "Rata-rata", "Median", "Standar Deviasi"),
-        Nilai = c(
-          length(data_original),
-          round(min(data_original, na.rm = TRUE), 3),
-          round(max(data_original, na.rm = TRUE), 3),
-          round(mean(data_original, na.rm = TRUE), 3),
-          round(median(data_original, na.rm = TRUE), 3),
-          round(sd(data_original, na.rm = TRUE), 3)
-        )
+      interpretasi_text <- output$interpretasi_output()
+      interpretation_lines <- unlist(strsplit(interpretasi_text, "\n"))
+      interpretation_formatted <- data.frame(
+        Interpretasi = interpretation_lines[interpretation_lines != ""]
       )
-      doc %>% body_add_flextable(flextable(stats_table) %>% autofit() %>% theme_box())
       
-      # Distribusi per kategori
-      doc %>% body_add_par("Distribusi per Kategori", style = "heading 2")
+      interpretation_grob <- gridExtra::tableGrob(
+        interpretation_formatted,
+        theme = gridExtra::ttheme_minimal(
+          base_size = 10,
+          core = list(
+            fg_params = list(hjust = 0, x = 0.02),
+            bg_params = list(fill = "white")
+          ),
+          colhead = list(
+            fg_params = list(hjust = 0, x = 0.02, fontface = "bold"),
+            bg_params = list(fill = "lightgray")
+          )
+        ),
+        rows = NULL
+      )
+      
+      # Buat plot distribusi kategori
       info <- kategori_info()
       kategori_counts <- table(info$data$Kategori)
-      distribusi_table <- data.frame(
+      plot_data <- data.frame(
         Kategori = names(kategori_counts),
         Jumlah = as.numeric(kategori_counts),
         Persentase = round(as.numeric(kategori_counts) / sum(kategori_counts) * 100, 1)
       )
-      doc %>% body_add_flextable(flextable(distribusi_table) %>% autofit() %>% theme_box())
       
-      print(doc, target = file)
-    }
-  )
-  
-  # Download laporan lengkap dalam format PDF
-  output$download_laporan_lengkap <- downloadHandler(
-    filename = function() {
-      paste0("laporan_kategorisasi_", gsub("[^A-Za-z0-9]", "_", input$variabel), "_", Sys.Date(), ".pdf")
-    },
-    content = function(file) {
-      # Buat temporary R Markdown file
-      temp_rmd <- tempfile(fileext = ".Rmd")
+      viz_plot <- ggplot(plot_data, aes(x = Kategori, y = Jumlah, fill = Kategori)) +
+        geom_bar(stat = "identity", alpha = 0.8) +
+        geom_text(aes(label = paste0(Jumlah, "\n(", Persentase, "%)")), 
+                  vjust = -0.5, size = 3) +
+        labs(title = "Distribusi Data per Kategori",
+             x = "Kategori", y = "Jumlah Observasi") +
+        theme_minimal() +
+        theme(legend.position = "none",
+              axis.text.x = element_text(angle = 45, hjust = 1)) +
+        scale_fill_brewer(type = "qual", palette = "Set2")
       
-      # Siapkan data
-      info <- kategori_info()
-      data_original <- data_sosial()[[input$variabel]]
-      kategori_counts <- table(info$data$Kategori)
+      # Gabungkan semua komponen
+      combined_plot <- gridExtra::grid.arrange(
+        header_grob,
+        viz_plot,
+        interpretation_grob,
+        ncol = 1,
+        heights = c(0.8, 3, 1.5)
+      )
       
-      # Konten R Markdown
-      rmd_content <- paste0('
----
-title: "Laporan Kategorisasi Data"
-subtitle: "Variabel: ', input$variabel, '"
-date: "', Sys.Date(), '"
-output: pdf_document
-geometry: margin=2cm
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
-library(ggplot2)
-library(knitr)
-```
-
-## Informasi Umum
-
-- **Variabel**: ', input$variabel, '
-- **Jumlah Kategori**: ', input$jumlah_kategori, '
-- **Metode**: Equal Interval
-- **Tanggal Analisis**: ', Sys.Date(), '
-
-## Interpretasi
-
-', gsub("\n", "\n\n", output$interpretasi_output()), '
-
-## Statistik Deskriptif
-
-```{r stats-table}
-stats_data <- data.frame(
-  Statistik = c("Jumlah Data", "Nilai Minimum", "Nilai Maksimum", "Rata-rata", "Median", "Standar Deviasi"),
-  Nilai = c(', length(data_original), ', ', round(min(data_original, na.rm = TRUE), 3), ', ', 
-              round(max(data_original, na.rm = TRUE), 3), ', ', round(mean(data_original, na.rm = TRUE), 3), ', ', 
-              round(median(data_original, na.rm = TRUE), 3), ', ', round(sd(data_original, na.rm = TRUE), 3), ')
-)
-kable(stats_data, caption = "Statistik Deskriptif")
-```
-
-## Distribusi per Kategori
-
-```{r dist-table}
-dist_data <- data.frame(
-  Kategori = c("', paste(names(kategori_counts), collapse = '", "'), '"),
-  Jumlah = c(', paste(as.numeric(kategori_counts), collapse = ', '), '),
-  Persentase = round(c(', paste(as.numeric(kategori_counts), collapse = ', '), ') / sum(c(', paste(as.numeric(kategori_counts), collapse = ', '), ')) * 100, 1)
-)
-kable(dist_data, caption = "Distribusi per Kategori")
-```
-
-## Visualisasi
-
-```{r plot, fig.height=4}
-# Bar plot distribusi kategori
-ggplot(dist_data, aes(x = Kategori, y = Jumlah, fill = Kategori)) +
-  geom_bar(stat = "identity", alpha = 0.8) +
-  geom_text(aes(label = paste0(Jumlah, "\\n(", Persentase, "%)")), 
-            vjust = -0.5, size = 3) +
-  labs(title = "Distribusi Data per Kategori",
-       x = "Kategori", y = "Jumlah Observasi") +
-  theme_minimal() +
-  theme(legend.position = "none",
-        axis.text.x = element_text(angle = 45, hjust = 1)) +
-  scale_fill_brewer(type = "qual", palette = "Set2")
-```
-')
-      
-      # Tulis file R Markdown
-      writeLines(rmd_content, temp_rmd)
-      
-      # Render ke PDF
-      tryCatch({
-        rmarkdown::render(temp_rmd, output_file = file, quiet = TRUE)
-      }, error = function(e) {
-        # Jika gagal render PDF, buat file teks sebagai fallback
-        writeLines(paste("Error rendering PDF:", e$message, 
-                        "\n\nFallback: Gunakan download TXT atau Word untuk laporan lengkap."), file)
-      })
-      
-      # Hapus file temporary
-      if (file.exists(temp_rmd)) file.remove(temp_rmd)
+      ggsave(file, combined_plot, width = 12, height = 16, device = "pdf", dpi = 300)
     }
   )
   
@@ -1328,6 +1209,93 @@ ggplot(dist_data, aes(x = Kategori, y = Jumlah, fill = Kategori)) +
       }
       
       print(doc, target = file)
+    }
+  )
+  
+  # Download laporan interpretasi uji proporsi dalam format PDF
+  output$download_proporsi_pdf <- downloadHandler(
+    filename = function() paste("laporan_uji_proporsi_", Sys.Date(), ".pdf", sep = ""),
+    content = function(file) {
+      req(prop_data())
+      
+      # Header informasi
+      header_text <- paste0(
+        "LAPORAN UJI PROPORSI SIGABISA\n",
+        "Sistem Informasi Geospasial Ancaman Bencana berbasis Indikator Sosial\n",
+        "Tanggal: ", format(Sys.Date(), "%d %B %Y"), "\n",
+        "Variabel: ", input$prop_var_biner, "\n",
+        "Label Sukses: ", input$prop_label_sukses, "\n",
+        "Label Gagal: ", input$prop_label_gagal, "\n",
+        paste(rep("=", 80), collapse = "")
+      )
+      
+      header_grob <- gridExtra::tableGrob(
+        data.frame(Header = header_text),
+        theme = gridExtra::ttheme_minimal(
+          base_size = 12,
+          core = list(fg_params = list(hjust = 0, x = 0.02)),
+          colhead = list(fg_params = list(hjust = 0, x = 0.02))
+        ),
+        rows = NULL, cols = NULL
+      )
+      
+      # Interpretasi
+      interpretasi_lines <- c(
+        paste("Interpretasi Uji Proporsi Satu Sampel:", output$prop1_test_interpretation()),
+        "",
+        paste("Interpretasi Uji Proporsi Dua Sampel:", output$prop2_test_interpretation())
+      )
+      interpretation_formatted <- data.frame(
+        Interpretasi = interpretasi_lines[interpretasi_lines != ""]
+      )
+      
+      interpretation_grob <- gridExtra::tableGrob(
+        interpretation_formatted,
+        theme = gridExtra::ttheme_minimal(
+          base_size = 10,
+          core = list(
+            fg_params = list(hjust = 0, x = 0.02),
+            bg_params = list(fill = "white")
+          ),
+          colhead = list(
+            fg_params = list(hjust = 0, x = 0.02, fontface = "bold"),
+            bg_params = list(fill = "lightgray")
+          )
+        ),
+        rows = NULL
+      )
+      
+      # Buat plot distribusi proporsi
+      df <- prop_data()
+      prop_counts <- table(df$prop_variable_biner)
+      plot_data <- data.frame(
+        Kategori = names(prop_counts),
+        Jumlah = as.numeric(prop_counts),
+        Proporsi = as.numeric(prop_counts) / sum(prop_counts)
+      )
+      
+      viz_plot <- ggplot(plot_data, aes(x = Kategori, y = Proporsi, fill = Kategori)) +
+        geom_col(alpha = 0.8, width = 0.6) +
+        geom_text(aes(label = paste0(round(Proporsi*100, 1), "%\n(n=", Jumlah, ")")), 
+                  vjust = -0.5, size = 4) +
+        scale_y_continuous(labels = scales::percent_format(), 
+                          limits = c(0, max(plot_data$Proporsi) * 1.1)) +
+        labs(title = "Distribusi Kategori Biner",
+             x = "Kategori", y = "Proporsi (%)") +
+        theme_minimal() +
+        theme(legend.position = "none") +
+        scale_fill_manual(values = c("#28a745", "#dc3545"))
+      
+      # Gabungkan semua komponen
+      combined_plot <- gridExtra::grid.arrange(
+        header_grob,
+        viz_plot,
+        interpretation_grob,
+        ncol = 1,
+        heights = c(0.8, 3, 1.5)
+      )
+      
+      ggsave(file, combined_plot, width = 12, height = 16, device = "pdf", dpi = 300)
     }
   )
   
@@ -1794,6 +1762,120 @@ ggplot(dist_data, aes(x = Kategori, y = Jumlah, fill = Kategori)) +
       doc %>% body_add_par(output$cluster_interpretation())
       
       print(doc, target = file)
+    }
+  )
+  
+  # Download laporan interpretasi clustering dalam format PDF
+  output$download_clustering_pdf <- downloadHandler(
+    filename = function() paste("laporan_clustering_", Sys.Date(), ".pdf", sep = ""),
+    content = function(file) {
+      results <- clustering_results()
+      req(results)
+      
+      # Header informasi
+      header_text <- paste0(
+        "LAPORAN ANALISIS CLUSTERING K-MEANS SIGABISA\n",
+        "Sistem Informasi Geospasial Ancaman Bencana berbasis Indikator Sosial\n",
+        "Tanggal: ", format(Sys.Date(), "%d %B %Y"), "\n",
+        "Jumlah Cluster: ", input$num_clusters, "\n",
+        "Variabel: ", paste(results$variables_used, collapse = ", "), "\n",
+        "Jumlah Observasi: ", nrow(results$data), "\n",
+        paste(rep("=", 80), collapse = "")
+      )
+      
+      header_grob <- gridExtra::tableGrob(
+        data.frame(Header = header_text),
+        theme = gridExtra::ttheme_minimal(
+          base_size = 12,
+          core = list(fg_params = list(hjust = 0, x = 0.02)),
+          colhead = list(fg_params = list(hjust = 0, x = 0.02))
+        ),
+        rows = NULL, cols = NULL
+      )
+      
+      # Interpretasi
+      interpretasi_text <- output$cluster_interpretation()
+      interpretation_lines <- unlist(strsplit(interpretasi_text, "\n"))
+      interpretation_formatted <- data.frame(
+        Interpretasi = interpretation_lines[interpretation_lines != ""]
+      )
+      
+      interpretation_grob <- gridExtra::tableGrob(
+        interpretation_formatted,
+        theme = gridExtra::ttheme_minimal(
+          base_size = 10,
+          core = list(
+            fg_params = list(hjust = 0, x = 0.02),
+            bg_params = list(fill = "white")
+          ),
+          colhead = list(
+            fg_params = list(hjust = 0, x = 0.02, fontface = "bold"),
+            bg_params = list(fill = "lightgray")
+          )
+        ),
+        rows = NULL
+      )
+      
+      # Buat plot clustering (PCA atau scatter plot)
+      if (length(results$variables_used) >= 2) {
+        if (length(results$variables_used) > 2) {
+          # Gunakan PCA untuk visualisasi
+          pca_result <- prcomp(results$scaled_data, scale. = FALSE)
+          plot_data <- data.frame(
+            PC1 = pca_result$x[, 1],
+            PC2 = pca_result$x[, 2],
+            Cluster = as.factor(results$kmeans_result$cluster)
+          )
+          
+          viz_plot <- ggplot(plot_data, aes(x = PC1, y = PC2, color = Cluster)) +
+            geom_point(size = 3, alpha = 0.7) +
+            labs(title = "Hasil Clustering (PCA Plot)",
+                 x = paste0("PC1 (", round(summary(pca_result)$importance[2,1] * 100, 1), "% variance)"),
+                 y = paste0("PC2 (", round(summary(pca_result)$importance[2,2] * 100, 1), "% variance)")) +
+            theme_minimal() +
+            scale_color_brewer(type = "qual", palette = "Set1")
+        } else {
+          # Scatter plot untuk 2 variabel
+          plot_data <- data.frame(
+            x = results$scaled_data[, 1],
+            y = results$scaled_data[, 2],
+            Cluster = as.factor(results$kmeans_result$cluster)
+          )
+          
+          viz_plot <- ggplot(plot_data, aes(x = x, y = y, color = Cluster)) +
+            geom_point(size = 3, alpha = 0.7) +
+            labs(title = "Hasil Clustering",
+                 x = results$variables_used[1],
+                 y = results$variables_used[2]) +
+            theme_minimal() +
+            scale_color_brewer(type = "qual", palette = "Set1")
+        }
+      } else {
+        # Plot sederhana untuk 1 variabel
+        plot_data <- data.frame(
+          Variable = results$scaled_data[, 1],
+          Cluster = as.factor(results$kmeans_result$cluster),
+          Index = 1:nrow(results$scaled_data)
+        )
+        
+        viz_plot <- ggplot(plot_data, aes(x = Index, y = Variable, color = Cluster)) +
+          geom_point(size = 3, alpha = 0.7) +
+          labs(title = "Hasil Clustering",
+               x = "Index", y = results$variables_used[1]) +
+          theme_minimal() +
+          scale_color_brewer(type = "qual", palette = "Set1")
+      }
+      
+      # Gabungkan semua komponen
+      combined_plot <- gridExtra::grid.arrange(
+        header_grob,
+        viz_plot,
+        interpretation_grob,
+        ncol = 1,
+        heights = c(0.8, 3, 1.5)
+      )
+      
+      ggsave(file, combined_plot, width = 12, height = 16, device = "pdf", dpi = 300)
     }
   )
   
