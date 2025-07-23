@@ -31,9 +31,17 @@ library(gridExtra) # Untuk layout PDF
 #================================================================#
 ui <- dashboardPage(
   skin = "blue",
-  dashboardHeader(title = "Dashboard Sosial"),
+  dashboardHeader(
+    title = tags$span(
+      icon("chart-line", style = "margin-right: 8px;"),
+      "Dashboard Analisis Sosial",
+      style = "font-size: 18px; font-weight: 600;"
+    )
+  ),
   dashboardSidebar(
+    width = 280,
     sidebarMenu(
+      id = "sidebar_menu",
       menuItem("Beranda", tabName = "beranda", icon = icon("home")),
       menuItem("Manajemen Data", tabName = "manajemen_data", icon = icon("database")),
       menuItem("Eksplorasi Data", tabName = "eksplorasi_data", icon = icon("chart-bar")),
@@ -42,7 +50,6 @@ ui <- dashboardPage(
       menuItem("Uji Varians", tabName = "uji_varians", icon = icon("chart-area")),
       menuItem("Uji Proporsi", tabName = "uji_proporsi", icon = icon("percentage")),
       menuItem("ANOVA (>2 Kelompok)", tabName = "anova", icon = icon("braille")),
-      # --- MENU BARU DITAMBAHKAN DI SINI --- #
       menuItem("Regresi Linear Berganda", tabName = "regresi", icon = icon("line-chart")),
       menuItem("Analisis Clustering K-Means", tabName = "clustering", icon = icon("project-diagram"))
     )
@@ -50,9 +57,540 @@ ui <- dashboardPage(
   dashboardBody(
     tags$head(
       tags$style(HTML("
+        /* Import Google Fonts */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        /* Global Styles */
+        body, .main-header, .main-sidebar, .content-wrapper {
+          font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+        }
+        
+        /* Main Header Styling */
+        .main-header .navbar {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+          border: none !important;
+          box-shadow: 0 2px 15px rgba(0,0,0,0.1) !important;
+        }
+        
+        .main-header .navbar-brand {
+          color: white !important;
+          font-weight: 600 !important;
+        }
+        
+        /* Sidebar Styling */
+        .main-sidebar {
+          background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%) !important;
+          box-shadow: 3px 0 15px rgba(0,0,0,0.1) !important;
+        }
+        
+        .sidebar-menu > li > a {
+          color: #bdc3c7 !important;
+          border-left: 3px solid transparent !important;
+          transition: all 0.3s ease !important;
+          padding: 15px 20px !important;
+          font-weight: 500 !important;
+        }
+        
+        .sidebar-menu > li > a:hover {
+          background: rgba(255,255,255,0.1) !important;
+          color: white !important;
+          border-left: 3px solid #3498db !important;
+          transform: translateX(5px) !important;
+        }
+        
+        .sidebar-menu > li.active > a {
+          background: rgba(52, 152, 219, 0.2) !important;
+          color: white !important;
+          border-left: 3px solid #3498db !important;
+          box-shadow: inset 0 0 10px rgba(52, 152, 219, 0.3) !important;
+        }
+        
+        .sidebar-menu > li > a > i {
+          margin-right: 12px !important;
+          width: 20px !important;
+          text-align: center !important;
+        }
+        
+        /* Content Area */
+        .content-wrapper {
+          background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%) !important;
+          min-height: 100vh !important;
+        }
+        
+        .content {
+          padding: 25px !important;
+        }
+        
+        /* Box Styling */
+        .box {
+          border-radius: 12px !important;
+          box-shadow: 0 8px 25px rgba(0,0,0,0.08) !important;
+          border: none !important;
+          margin-bottom: 25px !important;
+          transition: all 0.3s ease !important;
+          background: white !important;
+        }
+        
+        .box:hover {
+          transform: translateY(-3px) !important;
+          box-shadow: 0 15px 35px rgba(0,0,0,0.12) !important;
+        }
+        
+        .box-header {
+          border-radius: 12px 12px 0 0 !important;
+          padding: 20px 25px 15px 25px !important;
+          border-bottom: 1px solid #ecf0f1 !important;
+        }
+        
+        .box-header.with-border {
+          border-bottom: 2px solid #ecf0f1 !important;
+        }
+        
+        .box-title {
+          font-size: 18px !important;
+          font-weight: 600 !important;
+          color: #2c3e50 !important;
+          margin: 0 !important;
+        }
+        
+        .box-body {
+          padding: 25px !important;
+          background: white !important;
+        }
+        
+        /* Box Colors */
+        .box-primary .box-header {
+          background: linear-gradient(135deg, #3498db, #2980b9) !important;
+          color: white !important;
+        }
+        
+        .box-primary .box-title {
+          color: white !important;
+        }
+        
+        .box-success .box-header {
+          background: linear-gradient(135deg, #27ae60, #229954) !important;
+          color: white !important;
+        }
+        
+        .box-success .box-title {
+          color: white !important;
+        }
+        
+        .box-info .box-header {
+          background: linear-gradient(135deg, #17a2b8, #138496) !important;
+          color: white !important;
+        }
+        
+        .box-info .box-title {
+          color: white !important;
+        }
+        
+        .box-warning .box-header {
+          background: linear-gradient(135deg, #f39c12, #e67e22) !important;
+          color: white !important;
+        }
+        
+        .box-warning .box-title {
+          color: white !important;
+        }
+        
+        /* Form Controls */
+        .form-control {
+          border: 2px solid #ecf0f1 !important;
+          border-radius: 8px !important;
+          padding: 12px 15px !important;
+          font-size: 14px !important;
+          transition: all 0.3s ease !important;
+          background: #fafbfc !important;
+        }
+        
+        .form-control:focus {
+          border-color: #3498db !important;
+          box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1) !important;
+          background: white !important;
+        }
+        
+        .selectize-input {
+          border: 2px solid #ecf0f1 !important;
+          border-radius: 8px !important;
+          padding: 8px 12px !important;
+          background: #fafbfc !important;
+          transition: all 0.3s ease !important;
+        }
+        
+        .selectize-input.focus {
+          border-color: #3498db !important;
+          box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1) !important;
+          background: white !important;
+        }
+        
         .selectize-dropdown-content .option {
           white-space: normal !important;
-          word-wrap: break-word;
+          word-wrap: break-word !important;
+          padding: 10px 12px !important;
+        }
+        
+        .selectize-dropdown-content .option:hover {
+          background: #f8f9fa !important;
+        }
+        
+        /* Buttons */
+        .btn {
+          border-radius: 8px !important;
+          padding: 10px 20px !important;
+          font-weight: 500 !important;
+          transition: all 0.3s ease !important;
+          border: none !important;
+          text-transform: none !important;
+        }
+        
+        .btn-primary {
+          background: linear-gradient(135deg, #3498db, #2980b9) !important;
+          color: white !important;
+        }
+        
+        .btn-primary:hover {
+          background: linear-gradient(135deg, #2980b9, #21618c) !important;
+          transform: translateY(-2px) !important;
+          box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3) !important;
+        }
+        
+        .btn-success {
+          background: linear-gradient(135deg, #27ae60, #229954) !important;
+          color: white !important;
+        }
+        
+        .btn-success:hover {
+          background: linear-gradient(135deg, #229954, #1e8449) !important;
+          transform: translateY(-2px) !important;
+          box-shadow: 0 5px 15px rgba(39, 174, 96, 0.3) !important;
+        }
+        
+        /* Tables */
+        .table {
+          background: white !important;
+          border-radius: 8px !important;
+          overflow: hidden !important;
+          box-shadow: 0 4px 15px rgba(0,0,0,0.05) !important;
+        }
+        
+        .table thead th {
+          background: linear-gradient(135deg, #34495e, #2c3e50) !important;
+          color: white !important;
+          border: none !important;
+          padding: 15px 12px !important;
+          font-weight: 600 !important;
+          text-transform: uppercase !important;
+          font-size: 12px !important;
+          letter-spacing: 0.5px !important;
+        }
+        
+        .table tbody tr {
+          transition: all 0.2s ease !important;
+        }
+        
+        .table tbody tr:hover {
+          background: #f8f9fa !important;
+          transform: scale(1.01) !important;
+        }
+        
+        .table tbody td {
+          padding: 12px !important;
+          border-color: #ecf0f1 !important;
+          vertical-align: middle !important;
+        }
+        
+        /* DataTables */
+        .dataTables_wrapper {
+          padding: 0 !important;
+        }
+        
+        .dataTables_info, .dataTables_paginate {
+          margin-top: 15px !important;
+        }
+        
+        .paginate_button {
+          border-radius: 6px !important;
+          margin: 0 2px !important;
+        }
+        
+        /* Tabs */
+        .nav-tabs {
+          border: none !important;
+          margin-bottom: 20px !important;
+        }
+        
+        .nav-tabs > li > a {
+          border: 2px solid transparent !important;
+          border-radius: 8px 8px 0 0 !important;
+          background: #f8f9fa !important;
+          color: #6c757d !important;
+          padding: 12px 20px !important;
+          font-weight: 500 !important;
+          transition: all 0.3s ease !important;
+        }
+        
+        .nav-tabs > li > a:hover {
+          background: #e9ecef !important;
+          color: #495057 !important;
+        }
+        
+        .nav-tabs > li.active > a {
+          background: linear-gradient(135deg, #3498db, #2980b9) !important;
+          color: white !important;
+          border-color: transparent !important;
+        }
+        
+        /* Plot areas */
+        .shiny-plot-output {
+          border-radius: 8px !important;
+          overflow: hidden !important;
+        }
+        
+        /* Leaflet */
+        .leaflet-container {
+          border-radius: 8px !important;
+          overflow: hidden !important;
+        }
+        
+        /* Progress bars */
+        .progress {
+          height: 8px !important;
+          border-radius: 4px !important;
+          background: #ecf0f1 !important;
+        }
+        
+        .progress-bar {
+          border-radius: 4px !important;
+        }
+        
+        /* Alerts */
+        .alert {
+          border-radius: 8px !important;
+          border: none !important;
+          padding: 15px 20px !important;
+        }
+        
+        /* Custom Cards for Beranda */
+        .welcome-card {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+          color: white !important;
+          border-radius: 15px !important;
+          padding: 30px !important;
+          margin-bottom: 25px !important;
+          box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3) !important;
+        }
+        
+        .metadata-section {
+          background: white !important;
+          border-radius: 12px !important;
+          padding: 25px !important;
+          margin-bottom: 20px !important;
+          box-shadow: 0 5px 20px rgba(0,0,0,0.08) !important;
+          border-left: 4px solid #3498db !important;
+        }
+        
+        .metadata-section h5 {
+          color: #2c3e50 !important;
+          font-weight: 600 !important;
+          margin-bottom: 15px !important;
+        }
+        
+        .metadata-section p {
+          margin-bottom: 12px !important;
+          line-height: 1.6 !important;
+        }
+        
+        .metadata-section strong {
+          color: #3498db !important;
+        }
+        
+        /* Radio buttons and checkboxes */
+        .radio label, .checkbox label {
+          font-weight: 500 !important;
+          color: #495057 !important;
+        }
+        
+        /* Help text */
+        .help-block {
+          color: #6c757d !important;
+          font-size: 13px !important;
+          margin-top: 5px !important;
+        }
+        
+        /* Loading animations */
+        .shiny-output-error {
+          color: #e74c3c !important;
+          background: #fdf2f2 !important;
+          border: 1px solid #fadbd8 !important;
+          border-radius: 8px !important;
+          padding: 15px !important;
+          margin: 10px 0 !important;
+        }
+        
+        .shiny-output-error:before {
+          content: "⚠️ ";
+          font-weight: bold;
+        }
+        
+        /* Action button enhancements */
+        .btn:focus {
+          box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.25) !important;
+        }
+        
+        .btn:active {
+          transform: translateY(1px) !important;
+        }
+        
+        /* Input groups styling */
+        .input-group .form-control {
+          border-right: none !important;
+        }
+        
+        .input-group-addon {
+          background: #f8f9fa !important;
+          border: 2px solid #ecf0f1 !important;
+          border-left: none !important;
+          border-radius: 0 8px 8px 0 !important;
+        }
+        
+        /* Collapsible box styling */
+        .box.collapsed-box .box-header {
+          border-radius: 12px !important;
+        }
+        
+        .box-tools {
+          padding: 5px !important;
+        }
+        
+        .box-tools .btn {
+          padding: 5px 8px !important;
+          margin-left: 5px !important;
+        }
+        
+        /* Custom scroll bar */
+        ::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+          background: #c1c1c1;
+          border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+          background: #a8a8a8;
+        }
+        
+        /* Enhanced verbatim output */
+        pre {
+          background: #f8f9fa !important;
+          border: 1px solid #e9ecef !important;
+          border-radius: 8px !important;
+          padding: 15px !important;
+          font-family: 'Monaco', 'Consolas', 'Ubuntu Mono', monospace !important;
+          font-size: 13px !important;
+          line-height: 1.5 !important;
+          color: #2c3e50 !important;
+        }
+        
+        /* Icon enhancements */
+        .fa, .fas, .far, .fab {
+          vertical-align: middle !important;
+        }
+        
+        /* Improved spacing for form elements */
+        .form-group {
+          margin-bottom: 20px !important;
+        }
+        
+        label {
+          font-weight: 500 !important;
+          color: #2c3e50 !important;
+          margin-bottom: 8px !important;
+        }
+        
+        /* Enhanced hover effects for interactive elements */
+        .dataTables_filter input {
+          border-radius: 6px !important;
+          border: 1px solid #ddd !important;
+          padding: 6px 10px !important;
+        }
+        
+        .dataTables_length select {
+          border-radius: 6px !important;
+          border: 1px solid #ddd !important;
+          padding: 4px 8px !important;
+        }
+        
+        /* Improved visual hierarchy */
+        h1, h2, h3, h4, h5, h6 {
+          color: #2c3e50 !important;
+          font-weight: 600 !important;
+          margin-bottom: 15px !important;
+        }
+        
+        h1 { font-size: 24px !important; }
+        h2 { font-size: 22px !important; }
+        h3 { font-size: 20px !important; }
+        h4 { font-size: 18px !important; }
+        h5 { font-size: 16px !important; }
+        h6 { font-size: 14px !important; }
+        
+        /* Enhanced paragraph styling */
+        p {
+          line-height: 1.6 !important;
+          color: #34495e !important;
+          margin-bottom: 10px !important;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+          .content {
+            padding: 15px !important;
+          }
+          
+          .box-header {
+            padding: 15px 20px 10px 20px !important;
+          }
+          
+          .box-body {
+            padding: 20px !important;
+          }
+          
+          .sidebar-menu > li > a {
+            padding: 12px 15px !important;
+          }
+          
+          .welcome-card {
+            padding: 20px !important;
+          }
+          
+          .metadata-section {
+            padding: 15px !important;
+          }
+        }
+        
+        @media (max-width: 576px) {
+          .main-header .navbar-brand {
+            font-size: 16px !important;
+          }
+          
+          .box-title {
+            font-size: 16px !important;
+          }
+          
+          .btn {
+            padding: 8px 15px !important;
+            font-size: 13px !important;
+          }
         }
       "))
     ),
@@ -60,49 +598,96 @@ ui <- dashboardPage(
       tabItem(tabName = "beranda",
               fluidRow(
                 box(
-                  title = "Selamat Datang di Dashboard Analisis Kondisi Sosial Berdasarkan Kabupaten atau Kota",
+                  width = 12,
+                  div(class = "welcome-card",
+                    div(
+                      h1("🏛️ Dashboard Analisis Kondisi Sosial", 
+                         style = "margin: 0; font-weight: 700; font-size: 28px;"),
+                      h4("Kabupaten dan Kota di Indonesia", 
+                         style = "margin: 10px 0 0 0; font-weight: 400; opacity: 0.9;")
+                    )
+                  )
+                )
+              ),
+              fluidRow(
+                box(
+                  title = div(icon("info-circle", style = "margin-right: 8px;"), "Tentang Dashboard"),
                   width = 12, solidHeader = TRUE, status = "primary",
-                  h4("Tentang Dashboard"),
-                  p("Dashboard tentang data kondisi sosial di tingkat kabupaten/kota di Indonesia. Berisi alat-alat statistik mulai dari manajemen data, eksplorasi data, hingga untuk melakukan analisis statistik."),
-                  h4("Metadata"),
+                  div(class = "metadata-section",
+                    h4("📊 Fitur Utama Dashboard"),
+                    div(style = "display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;",
+                      div(style = "padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #3498db;",
+                        h5("🗃️ Manajemen Data", style = "color: #3498db; margin-bottom: 10px;"),
+                        p("Kategorisasi variabel numerik menggunakan metode Equal Interval")
+                      ),
+                      div(style = "padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #27ae60;",
+                        h5("📈 Eksplorasi Data", style = "color: #27ae60; margin-bottom: 10px;"),
+                        p("Visualisasi data dengan grafik peringkat dan peta interaktif")
+                      ),
+                      div(style = "padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #e74c3c;",
+                        h5("🧪 Analisis Statistik", style = "color: #e74c3c; margin-bottom: 10px;"),
+                        p("Uji asumsi, hipotesis, ANOVA, dan regresi linear berganda")
+                      ),
+                      div(style = "padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #9b59b6;",
+                        h5("🎯 Machine Learning", style = "color: #9b59b6; margin-bottom: 10px;"),
+                        p("Analisis clustering K-Means untuk segmentasi wilayah")
+                      )
+                    )
+                  ),
+                  br(),
+                  h4("📋 Metadata Variabel", style = "color: #2c3e50; font-weight: 600; margin-bottom: 20px;"),
                   tags$div(
-                    h5(strong("1. Identifikasi Wilayah"), style = "color: #3c8dbc; margin-top: 15px;"),
-                    p(strong("Kode_Kab_Kota:"), br(), "Kode Kabupaten atau Kota berdasarkan sumber BPS"),
-                    p(strong("Nama_Kab_Kota:"), br(), "Nama Kabupaten atau Kota"),
+                    div(class = "metadata-section",
+                      h5("🏘️ 1. Identifikasi Wilayah"),
+                      p(strong("Kode_Kab_Kota:"), br(), "Kode Kabupaten atau Kota berdasarkan sumber BPS"),
+                      p(strong("Nama_Kab_Kota:"), br(), "Nama Kabupaten atau Kota")
+                    ),
                     
-                    h5(strong("2. Data Demografis"), style = "color: #3c8dbc; margin-top: 20px;"),
-                    p(strong("Jumlah_Penduduk:"), br(), "Total jumlah penduduk di suatu kabupaten atau kota"),
-                    p(strong("Persentase_Perubahan_Penduduk:"), br(), "Persentase perubahan jumlah penduduk di suatu kabupaten atau kota"),
-                    p(strong("Persentase_Penduduk_Dibawah_Lima_Tahun:"), br(), "Persentase penduduk berusia kurang dari lima tahun di suatu kabupaten atau kota"),
-                    p(strong("Jumlah_Penduduk_Dibawah_Lima_Tahun:"), br(), "Jumlah penduduk berusia kurang dari lima tahun di suatu kabupaten atau kota"),
-                    p(strong("Persentase_Penduduk_Diatas_Enam_Puluh_Lima_Tahun:"), br(), "Persentase penduduk berusia lebih dari enam puluh lima tahun di suatu kabupaten atau kota"),
-                    p(strong("Jumlah_Penduduk_Diatas_Enam_Puluh_Lima_Tahun:"), br(), "Jumlah penduduk berusia lebih dari enam puluh lima tahun di suatu kabupaten atau kota"),
-                    p(strong("Persentase_Populasi_Penduduk_Perempuan:"), br(), "Persentase perempuan di suatu kabupaten atau kota"),
-                    p(strong("Jumlah_Penduduk_Perempuan:"), br(), "Jumlah penduduk perempuan di suatu kabupaten atau kota"),
+                    div(class = "metadata-section",
+                      h5("👥 2. Data Demografis"),
+                      p(strong("Jumlah_Penduduk:"), br(), "Total jumlah penduduk di suatu kabupaten atau kota"),
+                      p(strong("Persentase_Perubahan_Penduduk:"), br(), "Persentase perubahan jumlah penduduk di suatu kabupaten atau kota"),
+                      p(strong("Persentase_Penduduk_Dibawah_Lima_Tahun:"), br(), "Persentase penduduk berusia kurang dari lima tahun di suatu kabupaten atau kota"),
+                      p(strong("Jumlah_Penduduk_Dibawah_Lima_Tahun:"), br(), "Jumlah penduduk berusia kurang dari lima tahun di suatu kabupaten atau kota"),
+                      p(strong("Persentase_Penduduk_Diatas_Enam_Puluh_Lima_Tahun:"), br(), "Persentase penduduk berusia lebih dari enam puluh lima tahun di suatu kabupaten atau kota"),
+                      p(strong("Jumlah_Penduduk_Diatas_Enam_Puluh_Lima_Tahun:"), br(), "Jumlah penduduk berusia lebih dari enam puluh lima tahun di suatu kabupaten atau kota"),
+                      p(strong("Persentase_Populasi_Penduduk_Perempuan:"), br(), "Persentase perempuan di suatu kabupaten atau kota"),
+                      p(strong("Jumlah_Penduduk_Perempuan:"), br(), "Jumlah penduduk perempuan di suatu kabupaten atau kota")
+                    ),
                     
-                    h5(strong("3. Data Rumah Tangga"), style = "color: #3c8dbc; margin-top: 20px;"),
-                    p(strong("Persentase_Rumah_Tangga_Dengan_Kepala_Keluarga_Perempuan:"), br(), "Persentase rumah tangga di suatu kabupaten atau kota yang kepala keluarganya adalah Wanita"),
-                    p(strong("Rata_Rata_Anggota_Rumah_Tangga_Di_Satu_Kabupaten_Kota:"), br(), "Rata-rata jumlah anggota per setiap rumah tangga di suatu kabupaten atau kota"),
-                    p(strong("Persentase_Rumah_Tangga_Yang_Menyewa_Rumah:"), br(), "Persentase rumah tangga di suatu kabupaten atau kota yang menyewa rumah"),
+                    div(class = "metadata-section",
+                      h5("🏠 3. Data Rumah Tangga"),
+                      p(strong("Persentase_Rumah_Tangga_Dengan_Kepala_Keluarga_Perempuan:"), br(), "Persentase rumah tangga di suatu kabupaten atau kota yang kepala keluarganya adalah Wanita"),
+                      p(strong("Rata_Rata_Anggota_Rumah_Tangga_Di_Satu_Kabupaten_Kota:"), br(), "Rata-rata jumlah anggota per setiap rumah tangga di suatu kabupaten atau kota"),
+                      p(strong("Persentase_Rumah_Tangga_Yang_Menyewa_Rumah:"), br(), "Persentase rumah tangga di suatu kabupaten atau kota yang menyewa rumah")
+                    ),
                     
-                    h5(strong("4. Pendidikan dan Literasi"), style = "color: #3c8dbc; margin-top: 20px;"),
-                    p(strong("Persentase_Penduduk_Usia_Lima_Belas_Tahun_Ke_Atas_Yang_Berpendidikan_Rendah:"), br(), "Persentase penduduk berusia 15 tahun ke atas yang berpendidikan rendah di suatu kabupaten atau kota"),
-                    p(strong("Jumlah_Penduduk_Usia_Lima_Belas_Tahun_Ke_Atas_Yang_Berpendidikan_Rendah:"), br(), "Jumlah penduduk berusia 15 tahun ke atas yang berpendidikan rendah di suatu kabupaten atau kota"),
-                    p(strong("Persentase_Penduduk_Yang_Tidak_Bisa_Baca_Tulis:"), br(), "Persentase penduduk di suatu kabupaten atau kota yang tidak bisa membaca dan menulis"),
-                    p(strong("Jumlah_Penduduk_Yang_Tidak_Bisa_Baca_Tulis:"), br(), "Jumlah penduduk di suatu kabupaten atau kota yang tidak bisa membaca dan menulis"),
+                    div(class = "metadata-section",
+                      h5("🎓 4. Pendidikan dan Literasi"),
+                      p(strong("Persentase_Penduduk_Usia_Lima_Belas_Tahun_Ke_Atas_Yang_Berpendidikan_Rendah:"), br(), "Persentase penduduk berusia 15 tahun ke atas yang berpendidikan rendah di suatu kabupaten atau kota"),
+                      p(strong("Jumlah_Penduduk_Usia_Lima_Belas_Tahun_Ke_Atas_Yang_Berpendidikan_Rendah:"), br(), "Jumlah penduduk berusia 15 tahun ke atas yang berpendidikan rendah di suatu kabupaten atau kota"),
+                      p(strong("Persentase_Penduduk_Yang_Tidak_Bisa_Baca_Tulis:"), br(), "Persentase penduduk di suatu kabupaten atau kota yang tidak bisa membaca dan menulis"),
+                      p(strong("Jumlah_Penduduk_Yang_Tidak_Bisa_Baca_Tulis:"), br(), "Jumlah penduduk di suatu kabupaten atau kota yang tidak bisa membaca dan menulis")
+                    ),
                     
-                    h5(strong("5. Kondisi Ekonomi"), style = "color: #3c8dbc; margin-top: 20px;"),
-                    p(strong("Persentase_Penduduk_Miskin:"), br(), "Persentase penduduk miskin di suatu kabupaten atau kota"),
-                    p(strong("Jumlah_Penduduk_Miskin:"), br(), "Jumlah penduduk miskin di suatu kabupaten atau kota"),
+                    div(class = "metadata-section",
+                      h5("💰 5. Kondisi Ekonomi"),
+                      p(strong("Persentase_Penduduk_Miskin:"), br(), "Persentase penduduk miskin di suatu kabupaten atau kota"),
+                      p(strong("Jumlah_Penduduk_Miskin:"), br(), "Jumlah penduduk miskin di suatu kabupaten atau kota")
+                    ),
                     
-                    h5(strong("6. Infrastruktur dan Utilitas"), style = "color: #3c8dbc; margin-top: 20px;"),
-                    p(strong("Persentase_Rumah_Tangga_Yang_Tidak_Menggunakan_Listrik_Sebagai_Sumber_Penerangan:"), br(), "Persentase rumah tangga di suatu kabupaen tau kota yang sumber penerangan di rumahnya bukan menggunakan listrik"),
-                    p(strong("Persentase_Rumah_Tangga_Pengguna_Air_Leding:"), br(), "Persentase rumah tangga di suatu kabupaten atau kota yang menggunakan air leding sebagai sumber airnya"),
-                    p(strong("Persentase_Rumah_Tangga_Yang_Tidak_Memiliki_Sistem_Drainase:"), br(), "Persentase rumah tangga di suatu kabupaten atau kota yang tidak memiliki system drainase"),
+                    div(class = "metadata-section",
+                      h5("🏗️ 6. Infrastruktur dan Utilitas"),
+                      p(strong("Persentase_Rumah_Tangga_Yang_Tidak_Menggunakan_Listrik_Sebagai_Sumber_Penerangan:"), br(), "Persentase rumah tangga di suatu kabupaen tau kota yang sumber penerangan di rumahnya bukan menggunakan listrik"),
+                      p(strong("Persentase_Rumah_Tangga_Pengguna_Air_Leding:"), br(), "Persentase rumah tangga di suatu kabupaten atau kota yang menggunakan air leding sebagai sumber airnya"),
+                      p(strong("Persentase_Rumah_Tangga_Yang_Tidak_Memiliki_Sistem_Drainase:"), br(), "Persentase rumah tangga di suatu kabupaten atau kota yang tidak memiliki system drainase")
+                    ),
                     
-                    h5(strong("7. Manajemen Bencana"), style = "color: #3c8dbc; margin-top: 20px;"),
-                    p(strong("Persentase_Rumah_Tangga_Yang_Tidak_Mendapat_Pelatihan_Bencana:"), br(), "Persentase rumah tangga yang tidak mendapat pelatihan mitigasi bencana di suatu kabupaten atau kota"),
-                    p(strong("Persentase_Rumah_Tangga_Yang_Tinggal_Di_Daerah_Rawan_Bencana:"), br(), "Persentase rumah tangga di suatu kabupaten atau kota yang tinggal di daerah bencana")
+                    div(class = "metadata-section",
+                      h5("⚠️ 7. Manajemen Bencana"),
+                      p(strong("Persentase_Rumah_Tangga_Yang_Tidak_Mendapat_Pelatihan_Bencana:"), br(), "Persentase rumah tangga yang tidak mendapat pelatihan mitigasi bencana di suatu kabupaten atau kota"),
+                      p(strong("Persentase_Rumah_Tangga_Yang_Tinggal_Di_Daerah_Rawan_Bencana:"), br(), "Persentase rumah tangga di suatu kabupaten atau kota yang tinggal di daerah bencana")
+                    )
                   ),
                 )
               )
@@ -111,32 +696,46 @@ ui <- dashboardPage(
       tabItem(tabName = "manajemen_data",
               fluidRow(
                 box(
-                  title = "Pengaturan Kategorisasi",
+                  title = div(icon("cogs", style = "margin-right: 8px;"), "Pengaturan Kategorisasi"),
                   width = 4,
                   solidHeader = TRUE,
                   status = "primary",
-                  uiOutput("variabel_selector"),
-                  selectInput("jumlah_kategori", "Pilih Jumlah Kategori:",
-                              choices = c(2, 3, 5), selected = 3),
-                  hr()
+                  div(style = "margin-bottom: 20px;",
+                    uiOutput("variabel_selector"),
+                    selectInput("jumlah_kategori", "Pilih Jumlah Kategori:",
+                                choices = c(2, 3, 5), selected = 3),
+                    hr(),
+                    div(style = "background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #17a2b8;",
+                      h5("ℹ️ Informasi", style = "color: #17a2b8; margin-bottom: 10px;"),
+                      p("Metode Equal Interval membagi data menjadi interval yang sama panjang berdasarkan nilai minimum dan maksimum.", style = "margin: 0; font-size: 13px;")
+                    )
+                  )
                 ),
                 box(
-                  title = "Hasil Kategorisasi Data",
+                  title = div(icon("table", style = "margin-right: 8px;"), "Hasil Kategorisasi Data"),
                   width = 8,
                   solidHeader = TRUE,
                   status = "primary",
                   tabsetPanel(
-                    tabPanel("Tabel Data",
-                             DTOutput("tabel_data"),
-                             br(),
-                             h5("Keterangan:"),
-                             p("Tabel menampilkan data asli dengan kategori yang telah dibuat berdasarkan metode Equal Interval.")
+                    id = "kategori_tabs",
+                    tabPanel("📊 Tabel Data",
+                             div(style = "margin-bottom: 15px;",
+                               DTOutput("tabel_data")
+                             ),
+                             div(style = "background: #e8f4fd; padding: 15px; border-radius: 8px; border-left: 4px solid #3498db;",
+                               h5("📋 Keterangan:", style = "color: #2980b9; margin-bottom: 8px;"),
+                               p("Tabel menampilkan data asli dengan kategori yang telah dibuat berdasarkan metode Equal Interval.", style = "margin: 0;")
+                             )
                     ),
-                    tabPanel("Interpretasi",
-                             verbatimTextOutput("interpretasi_output"),
+                    tabPanel("📈 Interpretasi",
+                             div(style = "background: white; padding: 20px; border-radius: 8px; border: 1px solid #ecf0f1;",
+                               verbatimTextOutput("interpretasi_output")
+                             ),
                              br(),
-                             h5("Penjelasan Metode:"),
-                             p("Equal Interval: Membagi rentang nilai menjadi interval yang sama panjang berdasarkan nilai minimum dan maksimum data.")
+                             div(style = "background: #f0f8f0; padding: 15px; border-radius: 8px; border-left: 4px solid #27ae60;",
+                               h5("🔍 Penjelasan Metode:", style = "color: #27ae60; margin-bottom: 8px;"),
+                               p("Equal Interval: Membagi rentang nilai menjadi interval yang sama panjang berdasarkan nilai minimum dan maksimum data.", style = "margin: 0;")
+                             )
                     )
                   )
                 )
@@ -146,7 +745,7 @@ ui <- dashboardPage(
       tabItem(tabName = "uji_asumsi",
               fluidRow(
                 box(
-                  title = "Uji Normalitas",
+                  title = div(icon("flask", style = "margin-right: 8px;"), "Uji Normalitas"),
                   width = 12, solidHeader = TRUE, status = "primary", collapsible = TRUE,
                   fluidRow(
                     column(width = 4,
@@ -169,7 +768,7 @@ ui <- dashboardPage(
               ),
               fluidRow(
                 box(
-                  title = "Uji Homogenitas Varian (Levene's Test)",
+                  title = div(icon("balance-scale", style = "margin-right: 8px;"), "Uji Homogenitas Varian (Levene's Test)"),
                   width = 12, solidHeader = TRUE, status = "success", collapsible = TRUE,
                   fluidRow(
                     column(width = 4,
@@ -193,7 +792,7 @@ ui <- dashboardPage(
       
       tabItem(tabName = "uji_rata",
               fluidRow(
-                box(title = "Uji-t Satu Sampel", width = 12, solidHeader = TRUE, status = "primary", collapsible = TRUE,
+                box(title = div(icon("calculator", style = "margin-right: 8px;"), "Uji-t Satu Sampel"), width = 12, solidHeader = TRUE, status = "primary", collapsible = TRUE,
                     fluidRow(
                       column(width = 4,
                              h4("Pengaturan"),
@@ -211,7 +810,7 @@ ui <- dashboardPage(
                 )
               ),
               fluidRow(
-                box(title = "Uji-t Dua Sampel Independen", width = 12, solidHeader = TRUE, status = "success", collapsible = TRUE,
+                box(title = div(icon("users", style = "margin-right: 8px;"), "Uji-t Dua Sampel Independen"), width = 12, solidHeader = TRUE, status = "success", collapsible = TRUE,
                     fluidRow(
                       column(width = 4,
                              h4("Pengaturan"),
@@ -234,7 +833,7 @@ ui <- dashboardPage(
       
       tabItem(tabName = "uji_varians",
               fluidRow(
-                box(title = "Uji Varians Satu Sampel (Chi-Square Test)", width = 12, solidHeader = TRUE, status = "primary", collapsible = TRUE,
+                box(title = div(icon("chart-area", style = "margin-right: 8px;"), "Uji Varians Satu Sampel (Chi-Square Test)"), width = 12, solidHeader = TRUE, status = "primary", collapsible = TRUE,
                     fluidRow(
                       column(width = 4,
                              h4("Pengaturan"),
@@ -252,7 +851,7 @@ ui <- dashboardPage(
                 )
               ),
               fluidRow(
-                box(title = "Uji Varians Dua Sampel (F-Test)", width = 12, solidHeader = TRUE, status = "success", collapsible = TRUE,
+                box(title = div(icon("chart-line", style = "margin-right: 8px;"), "Uji Varians Dua Sampel (F-Test)"), width = 12, solidHeader = TRUE, status = "success", collapsible = TRUE,
                     fluidRow(
                       column(width = 4,
                              h4("Pengaturan"),
@@ -276,7 +875,7 @@ ui <- dashboardPage(
       tabItem(tabName = "uji_proporsi",
               fluidRow(
                 box(
-                  title = "Langkah 1: Persiapan Variabel Proporsi", width = 12, solidHeader = TRUE, status = "info",
+                  title = div(icon("cog", style = "margin-right: 8px;"), "Langkah 1: Persiapan Variabel Proporsi"), width = 12, solidHeader = TRUE, status = "info",
                   p("Uji proporsi memerlukan variabel biner (Dua kategori, misal: 'Tinggi'/'Rendah'). Buat variabel tersebut di sini."),
                   column(width = 4,
                          uiOutput("prop_var_selector"),
@@ -297,7 +896,7 @@ ui <- dashboardPage(
               ),
               fluidRow(
                 box(
-                  title = "Uji Proporsi Satu Sampel", width = 6, solidHeader = TRUE, status = "primary", collapsible = TRUE,
+                  title = div(icon("percentage", style = "margin-right: 8px;"), "Uji Proporsi Satu Sampel"), width = 6, solidHeader = TRUE, status = "primary", collapsible = TRUE,
                   p("Menguji apakah proporsi kategori 'sukses' pada data sama dengan nilai hipotesis."),
                   hr(),
                   numericInput("prop1_p_hipotesis", "Nilai Proporsi Hipotesis (antara 0 dan 1):", 0.5, min = 0, max = 1, step = 0.01),
@@ -308,7 +907,7 @@ ui <- dashboardPage(
                   textOutput("prop1_test_interpretation")
                 ),
                 box(
-                  title = "Uji Proporsi Dua Sampel", width = 6, solidHeader = TRUE, status = "primary", collapsible = TRUE,
+                  title = div(icon("balance-scale", style = "margin-right: 8px;"), "Uji Proporsi Dua Sampel"), width = 6, solidHeader = TRUE, status = "primary", collapsible = TRUE,
                   p("Membandingkan proporsi kategori 'sukses' antara dua kelompok. Kelompok dibuat di tab 'Manajemen Data'."),
                   hr(),
                   uiOutput("prop2_group_selectors_ui"),
@@ -325,7 +924,7 @@ ui <- dashboardPage(
       tabItem(tabName = "anova",
               fluidRow(
                 box(
-                  title = "ANOVA Satu Arah (One-Way ANOVA)", width = 12, solidHeader = TRUE, status = "primary", collapsible = TRUE,
+                  title = div(icon("braille", style = "margin-right: 8px;"), "ANOVA Satu Arah (One-Way ANOVA)"), width = 12, solidHeader = TRUE, status = "primary", collapsible = TRUE,
                   fluidRow(
                     column(width = 4,
                            h4("Pengaturan"),
@@ -350,11 +949,10 @@ ui <- dashboardPage(
               
       ),
       
-      # --- KONTEN HALAMAN BARU DITAMBAHKAN DI SINI --- #
-      tabItem(tabName = "clustering",
+              tabItem(tabName = "clustering",
               fluidRow(
                 box(
-                  title = "Pengaturan Analisis Clustering K-Means", width = 4, solidHeader = TRUE, status = "primary",
+                  title = div(icon("cogs", style = "margin-right: 8px;"), "Pengaturan Analisis Clustering K-Means"), width = 4, solidHeader = TRUE, status = "primary",
                   h4("Pilih Variabel untuk Clustering"),
                   uiOutput("clustering_var_selector"),
                   helpText("Pilih variabel numerik yang akan digunakan dalam analisis clustering."),
@@ -369,7 +967,7 @@ ui <- dashboardPage(
                   actionButton("run_clustering", "Jalankan Analisis Clustering", icon = icon("play-circle"), class = "btn-primary")
                 ),
                 box(
-                  title = "Hasil Clustering", width = 8, solidHeader = TRUE, status = "primary",
+                  title = div(icon("chart-bar", style = "margin-right: 8px;"), "Hasil Clustering"), width = 8, solidHeader = TRUE, status = "primary",
                   tabsetPanel(
                     tabPanel("Ringkasan Hasil",
                              h4("Informasi Cluster"),
@@ -398,21 +996,21 @@ ui <- dashboardPage(
               ),
               fluidRow(
                 box(
-                  title = "Visualisasi Clustering", width = 6, solidHeader = TRUE, status = "info",
+                  title = div(icon("project-diagram", style = "margin-right: 8px;"), "Visualisasi Clustering"), width = 6, solidHeader = TRUE, status = "info",
                   plotOutput("cluster_plot", height = "400px")
                 ),
                 box(
-                  title = "Elbow Method untuk Menentukan k Optimal", width = 6, solidHeader = TRUE, status = "info",
+                  title = div(icon("chart-line", style = "margin-right: 8px;"), "Elbow Method untuk Menentukan k Optimal"), width = 6, solidHeader = TRUE, status = "info",
                   plotOutput("elbow_plot", height = "400px")
                 )
               ),
               
       ),
       
-      tabItem(tabName = "regresi",
+              tabItem(tabName = "regresi",
               fluidRow(
                 box(
-                  title = "Pengaturan Regresi Linear Berganda", width = 4, solidHeader = TRUE, status = "primary",
+                  title = div(icon("cogs", style = "margin-right: 8px;"), "Pengaturan Regresi Linear Berganda"), width = 4, solidHeader = TRUE, status = "primary",
                   uiOutput("reg_var_dependen_selector"),
                   uiOutput("reg_var_independen_selector"),
                   
@@ -422,13 +1020,13 @@ ui <- dashboardPage(
                   actionButton("run_regression", "Jalankan Analisis Regresi", icon = icon("play-circle"))
                 ),
                 box(
-                  title = "Hasil Model Regresi Linear Berganda", width = 8, solidHeader = TRUE, status = "primary",
+                  title = div(icon("line-chart", style = "margin-right: 8px;"), "Hasil Model Regresi Linear Berganda"), width = 8, solidHeader = TRUE, status = "primary",
                   verbatimTextOutput("reg_model_summary")
                 )
               ),
               fluidRow(
                 box(
-                  title = "Uji Asumsi Klasik", width = 12, solidHeader = TRUE, status = "info", collapsible = TRUE, collapsed = FALSE,
+                  title = div(icon("check-circle", style = "margin-right: 8px;"), "Uji Asumsi Klasik"), width = 12, solidHeader = TRUE, status = "info", collapsible = TRUE, collapsed = FALSE,
                   tabsetPanel(
                     tabPanel("1. Normalitas Residual", 
                              fluidRow(
@@ -470,37 +1068,37 @@ ui <- dashboardPage(
               )
       ),
       
-      tabItem(tabName = "eksplorasi_data",
+              tabItem(tabName = "eksplorasi_data",
               fluidRow(
                 box(
-                  title = "Pengaturan Eksplorasi", width = 4, status = "info", solidHeader = TRUE,
+                  title = div(icon("sliders-h", style = "margin-right: 8px;"), "Pengaturan Eksplorasi"), width = 4, status = "info", solidHeader = TRUE,
                   selectInput("variabel_eksplorasi", "Pilih Variabel:", choices = NULL),
                   radioButtons("pilihan_peringkat", "Tampilkan Peringkat:",
                                choices = c("10 Tertinggi" = "top", "10 Terendah" = "bottom"),
                                selected = "top")
                 ),
                 box(
-                  title = "Statistik Deskriptif", width = 8, status = "info", solidHeader = TRUE,
+                  title = div(icon("calculator", style = "margin-right: 8px;"), "Statistik Deskriptif"), width = 8, status = "info", solidHeader = TRUE,
                   tableOutput("summary_table"),
                   verbatimTextOutput("interpretasi_stat")
                 )
               ),
               fluidRow(
                 box(
-                  title = "Diagram Batang Peringkat Kabupaten/Kota", width = 12, status = "primary", solidHeader = TRUE,
+                  title = div(icon("chart-bar", style = "margin-right: 8px;"), "Diagram Batang Peringkat Kabupaten/Kota"), width = 12, status = "primary", solidHeader = TRUE,
                   plotOutput("peringkat_plot", height = "450px")
                 )
               ),
               fluidRow(
                 box(
-                  title = "Peta Interaktif (OSM - Memerlukan Internet)",
+                  title = div(icon("map", style = "margin-right: 8px;"), "Peta Interaktif (OSM - Memerlukan Internet)"),
                   width = 12, status = "info", solidHeader = TRUE,
                   leafletOutput("peta_interaktif", height = "600px")
                 )
               ),
               fluidRow(
                 box(
-                  title = "Peta Statis (Offline)",
+                  title = div(icon("globe", style = "margin-right: 8px;"), "Peta Statis (Offline)"),
                   width = 12, status = "success", solidHeader = TRUE,
                   plotOutput("peta_statis", height = "600px")
                 )
