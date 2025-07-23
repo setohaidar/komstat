@@ -36,6 +36,7 @@ ui <- dashboardPage(
     sidebarMenu(
       menuItem("Beranda", tabName = "beranda", icon = icon("home")),
       menuItem("Manajemen Data", tabName = "manajemen_data", icon = icon("database")),
+      menuItem("Eksplorasi Data", tabName = "eksplorasi_data", icon = icon("chart-bar")),
       menuItem("Uji Asumsi", tabName = "uji_asumsi", icon = icon("flask")),
       menuItem("Uji Beda Rata-rata", tabName = "uji_rata", icon = icon("balance-scale")),
       menuItem("Uji Varians", tabName = "uji_varians", icon = icon("chart-area")),
@@ -43,8 +44,7 @@ ui <- dashboardPage(
       menuItem("ANOVA (>2 Kelompok)", tabName = "anova", icon = icon("braille")),
       # --- MENU BARU DITAMBAHKAN DI SINI --- #
       menuItem("Regresi Linear Berganda", tabName = "regresi", icon = icon("line-chart")),
-      menuItem("Analisis Clustering K-Means", tabName = "clustering", icon = icon("project-diagram")),
-      menuItem("Eksplorasi Data", tabName = "eksplorasi_data", icon = icon("chart-bar"))
+      menuItem("Analisis Clustering K-Means", tabName = "clustering", icon = icon("project-diagram"))
     )
   ),
   dashboardBody(
@@ -62,13 +62,48 @@ ui <- dashboardPage(
                 box(
                   title = "Selamat Datang di Dashboard Analisis Kondisi Sosial Berdasarkan Kabupaten atau Kota",
                   width = 12, solidHeader = TRUE, status = "primary",
-                  h4("Tentang Dashboard Ini"),
+                  h4("Tentang Dashboard"),
                   p("Dashboard tentang data kondisi sosial di tingkat kabupaten/kota di Indonesia. Berisi alat-alat statistik mulai dari manajemen data, eksplorasi data, hingga untuk melakukan analisis statistik."),
                   h4("Metadata"),
-                  p("Data yang digunakan: 'Kondisi_Sosial_Per_KabKota_Excel.xlsx' dan 'Peta_Kabupaten_Kota.geojson'. Pastikan kedua file ini berada di folder yang sama dengan aplikasi."),
-                  p("Dibuat menggunakan R dan Shiny."),
-                  h4("Cara Penggunaan"),
-                  p("Gunakan menu di samping untuk bernavigasi. 'Manajemen Data' untuk kategorisasi, 'Uji Asumsi' untuk tes statistik, dan 'Eksplorasi Data' untuk visualisasi.")
+                  tags$div(
+                    h5(strong("1. Identifikasi Wilayah"), style = "color: #3c8dbc; margin-top: 15px;"),
+                    p(strong("Kode_Kab_Kota:"), br(), "Kode Kabupaten atau Kota berdasarkan sumber BPS"),
+                    p(strong("Nama_Kab_Kota:"), br(), "Nama Kabupaten atau Kota"),
+                    
+                    h5(strong("2. Data Demografis"), style = "color: #3c8dbc; margin-top: 20px;"),
+                    p(strong("Jumlah_Penduduk:"), br(), "Total jumlah penduduk di suatu kabupaten atau kota"),
+                    p(strong("Persentase_Perubahan_Penduduk:"), br(), "Persentase perubahan jumlah penduduk di suatu kabupaten atau kota"),
+                    p(strong("Persentase_Penduduk_Dibawah_Lima_Tahun:"), br(), "Persentase penduduk berusia kurang dari lima tahun di suatu kabupaten atau kota"),
+                    p(strong("Jumlah_Penduduk_Dibawah_Lima_Tahun:"), br(), "Jumlah penduduk berusia kurang dari lima tahun di suatu kabupaten atau kota"),
+                    p(strong("Persentase_Penduduk_Diatas_Enam_Puluh_Lima_Tahun:"), br(), "Persentase penduduk berusia lebih dari enam puluh lima tahun di suatu kabupaten atau kota"),
+                    p(strong("Jumlah_Penduduk_Diatas_Enam_Puluh_Lima_Tahun:"), br(), "Jumlah penduduk berusia lebih dari enam puluh lima tahun di suatu kabupaten atau kota"),
+                    p(strong("Persentase_Populasi_Penduduk_Perempuan:"), br(), "Persentase perempuan di suatu kabupaten atau kota"),
+                    p(strong("Jumlah_Penduduk_Perempuan:"), br(), "Jumlah penduduk perempuan di suatu kabupaten atau kota"),
+                    
+                    h5(strong("3. Data Rumah Tangga"), style = "color: #3c8dbc; margin-top: 20px;"),
+                    p(strong("Persentase_Rumah_Tangga_Dengan_Kepala_Keluarga_Perempuan:"), br(), "Persentase rumah tangga di suatu kabupaten atau kota yang kepala keluarganya adalah Wanita"),
+                    p(strong("Rata_Rata_Anggota_Rumah_Tangga_Di_Satu_Kabupaten_Kota:"), br(), "Rata-rata jumlah anggota per setiap rumah tangga di suatu kabupaten atau kota"),
+                    p(strong("Persentase_Rumah_Tangga_Yang_Menyewa_Rumah:"), br(), "Persentase rumah tangga di suatu kabupaten atau kota yang menyewa rumah"),
+                    
+                    h5(strong("4. Pendidikan dan Literasi"), style = "color: #3c8dbc; margin-top: 20px;"),
+                    p(strong("Persentase_Penduduk_Usia_Lima_Belas_Tahun_Ke_Atas_Yang_Berpendidikan_Rendah:"), br(), "Persentase penduduk berusia 15 tahun ke atas yang berpendidikan rendah di suatu kabupaten atau kota"),
+                    p(strong("Jumlah_Penduduk_Usia_Lima_Belas_Tahun_Ke_Atas_Yang_Berpendidikan_Rendah:"), br(), "Jumlah penduduk berusia 15 tahun ke atas yang berpendidikan rendah di suatu kabupaten atau kota"),
+                    p(strong("Persentase_Penduduk_Yang_Tidak_Bisa_Baca_Tulis:"), br(), "Persentase penduduk di suatu kabupaten atau kota yang tidak bisa membaca dan menulis"),
+                    p(strong("Jumlah_Penduduk_Yang_Tidak_Bisa_Baca_Tulis:"), br(), "Jumlah penduduk di suatu kabupaten atau kota yang tidak bisa membaca dan menulis"),
+                    
+                    h5(strong("5. Kondisi Ekonomi"), style = "color: #3c8dbc; margin-top: 20px;"),
+                    p(strong("Persentase_Penduduk_Miskin:"), br(), "Persentase penduduk miskin di suatu kabupaten atau kota"),
+                    p(strong("Jumlah_Penduduk_Miskin:"), br(), "Jumlah penduduk miskin di suatu kabupaten atau kota"),
+                    
+                    h5(strong("6. Infrastruktur dan Utilitas"), style = "color: #3c8dbc; margin-top: 20px;"),
+                    p(strong("Persentase_Rumah_Tangga_Yang_Tidak_Menggunakan_Listrik_Sebagai_Sumber_Penerangan:"), br(), "Persentase rumah tangga di suatu kabupaen tau kota yang sumber penerangan di rumahnya bukan menggunakan listrik"),
+                    p(strong("Persentase_Rumah_Tangga_Pengguna_Air_Leding:"), br(), "Persentase rumah tangga di suatu kabupaten atau kota yang menggunakan air leding sebagai sumber airnya"),
+                    p(strong("Persentase_Rumah_Tangga_Yang_Tidak_Memiliki_Sistem_Drainase:"), br(), "Persentase rumah tangga di suatu kabupaten atau kota yang tidak memiliki system drainase"),
+                    
+                    h5(strong("7. Manajemen Bencana"), style = "color: #3c8dbc; margin-top: 20px;"),
+                    p(strong("Persentase_Rumah_Tangga_Yang_Tidak_Mendapat_Pelatihan_Bencana:"), br(), "Persentase rumah tangga yang tidak mendapat pelatihan mitigasi bencana di suatu kabupaten atau kota"),
+                    p(strong("Persentase_Rumah_Tangga_Yang_Tinggal_Di_Daerah_Rawan_Bencana:"), br(), "Persentase rumah tangga di suatu kabupaten atau kota yang tinggal di daerah bencana")
+                  ),
                 )
               )
       ),
@@ -96,12 +131,6 @@ ui <- dashboardPage(
                              br(),
                              h5("Keterangan:"),
                              p("Tabel menampilkan data asli dengan kategori yang telah dibuat berdasarkan metode Equal Interval.")
-                    ),
-                    tabPanel("Ringkasan Statistik",
-                             DTOutput("summary_stats_table"),
-                             br(),
-                             h5("Keterangan:"),
-                             p("Statistik deskriptif untuk variabel yang dipilih dan distribusi per kategori.")
                     ),
                     tabPanel("Interpretasi",
                              verbatimTextOutput("interpretasi_output"),
