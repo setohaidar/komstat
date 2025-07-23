@@ -25,6 +25,9 @@ library(fpc) # Untuk validasi clustering
 library(scales) # Untuk formatting dalam plot
 library(writexl) # Untuk export Excel
 library(gridExtra) # Untuk layout PDF
+library(openxlsx) # Untuk membuat file Excel yang lebih baik
+library(htmlwidgets) # Untuk export widget HTML
+library(webshot) # Untuk export plot leaflet
 
 #================================================================#
 #                           UI (USER INTERFACE)                  #
@@ -129,6 +132,12 @@ ui <- dashboardPage(
                     tabPanel("Tabel Data",
                              DTOutput("tabel_data"),
                              br(),
+                             fluidRow(
+                               column(4, downloadButton("download_manajemen_csv", "Download Tabel CSV", class = "btn-primary")),
+                               column(4, downloadButton("download_manajemen_excel", "Download Tabel Excel", class = "btn-success")),
+                               column(4, downloadButton("download_manajemen_interpretasi", "Download Interpretasi", class = "btn-info"))
+                             ),
+                             br(),
                              h5("Keterangan:"),
                              p("Tabel menampilkan data asli dengan kategori yang telah dibuat berdasarkan metode Equal Interval.")
                     ),
@@ -162,7 +171,12 @@ ui <- dashboardPage(
                            verbatimTextOutput("norm_test_result"),
                            hr(),
                            h5("Interpretasi:", style = "font-weight:bold;"),
-                           textOutput("norm_test_interpretation")
+                           textOutput("norm_test_interpretation"),
+                           br(),
+                           fluidRow(
+                             column(6, downloadButton("download_norm_result", "Download Hasil Uji", class = "btn-primary")),
+                             column(6, downloadButton("download_norm_interpretasi", "Download Interpretasi", class = "btn-info"))
+                           )
                     )
                   )
                 )
@@ -183,7 +197,12 @@ ui <- dashboardPage(
                            verbatimTextOutput("homog_test_result"),
                            hr(),
                            h5("Interpretasi:", style = "font-weight:bold;"),
-                           textOutput("homog_test_interpretation")
+                           textOutput("homog_test_interpretation"),
+                           br(),
+                           fluidRow(
+                             column(6, downloadButton("download_homog_result", "Download Hasil Uji", class = "btn-primary")),
+                             column(6, downloadButton("download_homog_interpretasi", "Download Interpretasi", class = "btn-info"))
+                           )
                     )
                   )
                 )
@@ -205,7 +224,12 @@ ui <- dashboardPage(
                              verbatimTextOutput("ttest1_result"),
                              hr(),
                              h5("Interpretasi:", style = "font-weight:bold;"),
-                             textOutput("ttest1_interpretation")
+                             textOutput("ttest1_interpretation"),
+                             br(),
+                             fluidRow(
+                               column(6, downloadButton("download_ttest1_result", "Download Hasil Uji", class = "btn-primary")),
+                               column(6, downloadButton("download_ttest1_interpretasi", "Download Interpretasi", class = "btn-info"))
+                             )
                       )
                     )
                 )
@@ -224,7 +248,12 @@ ui <- dashboardPage(
                              verbatimTextOutput("ttest2_result"),
                              hr(),
                              h5("Interpretasi:", style = "font-weight:bold;"),
-                             textOutput("ttest2_interpretation")
+                             textOutput("ttest2_interpretation"),
+                             br(),
+                             fluidRow(
+                               column(6, downloadButton("download_ttest2_result", "Download Hasil Uji", class = "btn-primary")),
+                               column(6, downloadButton("download_ttest2_interpretasi", "Download Interpretasi", class = "btn-info"))
+                             )
                       )
                     )
                 )
@@ -246,7 +275,12 @@ ui <- dashboardPage(
                              uiOutput("var1_test_result_table"),
                              hr(),
                              h5("Interpretasi:", style = "font-weight:bold;"),
-                             textOutput("var1_test_interpretation")
+                             textOutput("var1_test_interpretation"),
+                             br(),
+                             fluidRow(
+                               column(6, downloadButton("download_var1_result", "Download Hasil Uji", class = "btn-primary")),
+                               column(6, downloadButton("download_var1_interpretasi", "Download Interpretasi", class = "btn-info"))
+                             )
                       )
                     )
                 )
@@ -265,7 +299,12 @@ ui <- dashboardPage(
                              uiOutput("var2_test_result_table"),
                              hr(),
                              h5("Interpretasi:", style = "font-weight:bold;"),
-                             textOutput("var2_test_interpretation")
+                             textOutput("var2_test_interpretation"),
+                             br(),
+                             fluidRow(
+                               column(6, downloadButton("download_var2_result", "Download Hasil Uji", class = "btn-primary")),
+                               column(6, downloadButton("download_var2_interpretasi", "Download Interpretasi", class = "btn-info"))
+                             )
                       )
                     )
                 )
@@ -305,7 +344,12 @@ ui <- dashboardPage(
                   uiOutput("prop1_test_result_table"),
                   hr(),
                   h5("Interpretasi:", style = "font-weight:bold;"),
-                  textOutput("prop1_test_interpretation")
+                  textOutput("prop1_test_interpretation"),
+                  br(),
+                  fluidRow(
+                    column(6, downloadButton("download_prop1_result", "Download Hasil Uji", class = "btn-primary")),
+                    column(6, downloadButton("download_prop1_interpretasi", "Download Interpretasi", class = "btn-info"))
+                  )
                 ),
                 box(
                   title = "Uji Proporsi Dua Sampel", width = 6, solidHeader = TRUE, status = "primary", collapsible = TRUE,
@@ -316,7 +360,12 @@ ui <- dashboardPage(
                   uiOutput("prop2_test_result_table"),
                   hr(),
                   h5("Interpretasi:", style = "font-weight:bold;"),
-                  textOutput("prop2_test_interpretation")
+                  textOutput("prop2_test_interpretation"),
+                  br(),
+                  fluidRow(
+                    column(6, downloadButton("download_prop2_result", "Download Hasil Uji", class = "btn-primary")),
+                    column(6, downloadButton("download_prop2_interpretasi", "Download Interpretasi", class = "btn-info"))
+                  )
                 )
               ),
               
@@ -342,7 +391,13 @@ ui <- dashboardPage(
                            uiOutput("anova1_posthoc_table"),
                            hr(),
                            h5("Interpretasi Keseluruhan:", style = "font-weight:bold;"),
-                           textOutput("anova1_interpretation")
+                           textOutput("anova1_interpretation"),
+                           br(),
+                           fluidRow(
+                             column(4, downloadButton("download_anova_result", "Download Tabel ANOVA", class = "btn-primary")),
+                             column(4, downloadButton("download_anova_posthoc", "Download Post-Hoc", class = "btn-success")),
+                             column(4, downloadButton("download_anova_interpretasi", "Download Interpretasi", class = "btn-info"))
+                           )
                     )
                   )
                 )
@@ -391,7 +446,13 @@ ui <- dashboardPage(
                              DTOutput("cluster_validation_table"),
                              hr(),
                              h4("Interpretasi"),
-                             verbatimTextOutput("cluster_interpretation")
+                             verbatimTextOutput("cluster_interpretation"),
+                             br(),
+                             fluidRow(
+                               column(4, downloadButton("download_cluster_data", "Download Data Cluster", class = "btn-primary")),
+                               column(4, downloadButton("download_cluster_summary", "Download Ringkasan", class = "btn-success")),
+                               column(4, downloadButton("download_cluster_interpretasi", "Download Interpretasi", class = "btn-info"))
+                             )
                     )
                   )
                 )
@@ -399,11 +460,15 @@ ui <- dashboardPage(
               fluidRow(
                 box(
                   title = "Visualisasi Clustering", width = 6, solidHeader = TRUE, status = "info",
-                  plotOutput("cluster_plot", height = "400px")
+                  plotOutput("cluster_plot", height = "400px"),
+                  br(),
+                  downloadButton("download_cluster_plot", "Download Plot Cluster", class = "btn-info")
                 ),
                 box(
                   title = "Elbow Method untuk Menentukan k Optimal", width = 6, solidHeader = TRUE, status = "info",
-                  plotOutput("elbow_plot", height = "400px")
+                  plotOutput("elbow_plot", height = "400px"),
+                  br(),
+                  downloadButton("download_elbow_plot", "Download Elbow Plot", class = "btn-info")
                 )
               ),
               
@@ -423,7 +488,13 @@ ui <- dashboardPage(
                 ),
                 box(
                   title = "Hasil Model Regresi Linear Berganda", width = 8, solidHeader = TRUE, status = "primary",
-                  verbatimTextOutput("reg_model_summary")
+                  verbatimTextOutput("reg_model_summary"),
+                  br(),
+                  fluidRow(
+                    column(4, downloadButton("download_reg_summary", "Download Summary Model", class = "btn-primary")),
+                    column(4, downloadButton("download_reg_data", "Download Data Regresi", class = "btn-success")),
+                    column(4, downloadButton("download_reg_asumsi", "Download Uji Asumsi", class = "btn-warning"))
+                  )
                 )
               ),
               fluidRow(
@@ -488,21 +559,32 @@ ui <- dashboardPage(
               fluidRow(
                 box(
                   title = "Diagram Batang Peringkat Kabupaten/Kota", width = 12, status = "primary", solidHeader = TRUE,
-                  plotOutput("peringkat_plot", height = "450px")
+                  plotOutput("peringkat_plot", height = "450px"),
+                  br(),
+                  fluidRow(
+                    column(3, downloadButton("download_eksplorasi_plot", "Download Grafik", class = "btn-primary")),
+                    column(3, downloadButton("download_eksplorasi_data", "Download Data CSV", class = "btn-success")),
+                    column(3, downloadButton("download_eksplorasi_interpretasi", "Download Interpretasi", class = "btn-info")),
+                    column(3, downloadButton("download_eksplorasi_statistik", "Download Statistik", class = "btn-warning"))
+                  )
                 )
               ),
               fluidRow(
                 box(
                   title = "Peta Interaktif (OSM - Memerlukan Internet)",
                   width = 12, status = "info", solidHeader = TRUE,
-                  leafletOutput("peta_interaktif", height = "600px")
+                  leafletOutput("peta_interaktif", height = "600px"),
+                  br(),
+                  downloadButton("download_peta_interaktif", "Download Peta Interaktif (HTML)", class = "btn-info")
                 )
               ),
               fluidRow(
                 box(
                   title = "Peta Statis (Offline)",
                   width = 12, status = "success", solidHeader = TRUE,
-                  plotOutput("peta_statis", height = "600px")
+                  plotOutput("peta_statis", height = "600px"),
+                  br(),
+                  downloadButton("download_peta_statis", "Download Peta Statis (PNG)", class = "btn-success")
                 )
               )
       )
@@ -1610,6 +1692,801 @@ server <- function(input, output, session) {
       theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16), legend.position = "bottom", legend.key.width = unit(1.5, "cm"))
   }, res = 96)
   
+  
+  #================================================================#
+  #                     DOWNLOAD HANDLERS                          #
+  #================================================================#
+  
+  # --- DOWNLOAD HANDLERS UNTUK MANAJEMEN DATA --- #
+  output$download_manajemen_csv <- downloadHandler(
+    filename = function() {
+      paste0("data_kategorisasi_", input$variabel, "_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      data_to_export <- kategori_info()$data %>% 
+        select(all_of(nama_kolom_kode), all_of(nama_kolom_kabupaten), all_of(input$variabel), Kategori)
+      write.csv(data_to_export, file, row.names = FALSE)
+    }
+  )
+  
+  output$download_manajemen_excel <- downloadHandler(
+    filename = function() {
+      paste0("data_kategorisasi_", input$variabel, "_", Sys.Date(), ".xlsx")
+    },
+    content = function(file) {
+      data_to_export <- kategori_info()$data %>% 
+        select(all_of(nama_kolom_kode), all_of(nama_kolom_kabupaten), all_of(input$variabel), Kategori)
+      write_xlsx(data_to_export, file)
+    }
+  )
+  
+  output$download_manajemen_interpretasi <- downloadHandler(
+    filename = function() {
+      paste0("interpretasi_kategorisasi_", input$variabel, "_", Sys.Date(), ".txt")
+    },
+    content = function(file) {
+      info <- kategori_info()
+      rentang_teks <- ""
+      for (i in 1:length(info$labels)) {
+        penutup <- ifelse(i == length(info$labels), "]", ")")
+        batas_bawah <- formatC(info$breaks[i], format = "f", digits = 2, decimal.mark = ".")
+        batas_atas <- formatC(info$breaks[i+1], format = "f", digits = 2, decimal.mark = ".")
+        rentang_teks <- paste0(rentang_teks, sprintf("   - %-15s: [%s - %s%s\n", info$labels[i], batas_bawah, batas_atas, penutup))
+      }
+      interpretasi_text <- paste0("HASIL KATEGORISASI DATA\n",
+                                  "Tanggal: ", Sys.Date(), "\n",
+                                  "==========================\n\n",
+                                  "Variabel: ", input$variabel, "\n",
+                                  "Jumlah Kategori: ", length(info$labels), "\n",
+                                  "Metode: Equal Interval\n\n",
+                                  "RENTANG NILAI:\n", rentang_teks, "\n",
+                                  "PENJELASAN METODE:\n",
+                                  "Equal Interval: Membagi rentang nilai menjadi interval yang sama panjang berdasarkan nilai minimum dan maksimum data.")
+      writeLines(interpretasi_text, file)
+    }
+  )
+  
+  # --- DOWNLOAD HANDLERS UNTUK EKSPLORASI DATA --- #
+  output$download_eksplorasi_plot <- downloadHandler(
+    filename = function() {
+      paste0("grafik_peringkat_", input$variabel_eksplorasi, "_", Sys.Date(), ".png")
+    },
+    content = function(file) {
+      df <- data_sosial()
+      var_eksplorasi <- input$variabel_eksplorasi
+      plot_df <- df %>%
+        select(all_of(c(nama_kolom_kode, nama_kolom_kabupaten, var_eksplorasi))) %>%
+        filter(!is.na(.data[[var_eksplorasi]])) %>%
+        mutate(label_unik = paste(.data[[nama_kolom_kode]], .data[[nama_kolom_kabupaten]]))
+      if (input$pilihan_peringkat == "top") {
+        plot_df <- plot_df %>% arrange(desc(.data[[var_eksplorasi]])) %>% head(10)
+        plot_title <- paste("10 Kabupaten/Kota dengan", gsub("_", " ", var_eksplorasi), "Tertinggi")
+      } else {
+        plot_df <- plot_df %>% arrange(.data[[var_eksplorasi]]) %>% head(10)
+        plot_title <- paste("10 Kabupaten/Kota dengan", gsub("_", " ", var_eksplorasi), "Terendah")
+      }
+      plot_df$label_unik <- factor(plot_df$label_unik, levels = rev(plot_df$label_unik))
+      plot_df$label_text <- if (var_eksplorasi %in% jumlah_vars) format(plot_df[[var_eksplorasi]], big.mark = "", scientific = FALSE, trim = TRUE) else as.character(round(plot_df[[var_eksplorasi]], 2))
+      max_val <- max(plot_df[[var_eksplorasi]], na.rm = TRUE)
+      
+      p <- ggplot(plot_df, aes(x = .data[[var_eksplorasi]], y = label_unik)) +
+        geom_col(fill = "steelblue", width = 0.7) +
+        geom_text(aes(label = label_text), hjust = 0, nudge_x = max_val * 0.01, size = 3.5) +
+        labs(title = plot_title, x = gsub("_", " ", var_eksplorasi), y = "Kode & Nama Kabupaten/Kota") +
+        theme_minimal(base_size = 12) +
+        theme(plot.title = element_text(hjust = 0.5, face = "bold"), 
+              panel.grid.major.y = element_blank(), 
+              panel.grid.minor.x = element_blank()) +
+        coord_cartesian(xlim = c(0, max_val * 1.25))
+      
+      ggsave(file, plot = p, width = 12, height = 8, dpi = 300)
+    }
+  )
+  
+  output$download_eksplorasi_data <- downloadHandler(
+    filename = function() {
+      paste0("data_eksplorasi_", input$variabel_eksplorasi, "_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      df <- data_sosial()
+      var_eksplorasi <- input$variabel_eksplorasi
+      data_to_export <- df %>%
+        select(all_of(c(nama_kolom_kode, nama_kolom_kabupaten, var_eksplorasi))) %>%
+        arrange(desc(.data[[var_eksplorasi]]))
+      write.csv(data_to_export, file, row.names = FALSE)
+    }
+  )
+  
+  output$download_eksplorasi_interpretasi <- downloadHandler(
+    filename = function() {
+      paste0("interpretasi_eksplorasi_", input$variabel_eksplorasi, "_", Sys.Date(), ".txt")
+    },
+    content = function(file) {
+      data <- data_sosial()[[input$variabel_eksplorasi]]
+      mean_val <- mean(data, na.rm = TRUE)
+      median_val <- median(data, na.rm = TRUE)
+      sd_val <- sd(data, na.rm = TRUE)
+      simpul <- ifelse(abs(mean_val - median_val) < sd_val * 0.1, "distribusi simetris", "distribusi tidak simetris")
+      
+      interpretasi_text <- paste0("INTERPRETASI EKSPLORASI DATA\n",
+                                  "Tanggal: ", Sys.Date(), "\n",
+                                  "=============================\n\n",
+                                  "Variabel: ", input$variabel_eksplorasi, "\n",
+                                  "Rata-rata: ", round(mean_val, 2), "\n",
+                                  "Median: ", round(median_val, 2), "\n",
+                                  "Standar Deviasi: ", round(sd_val, 2), "\n\n",
+                                  "INTERPRETASI:\n",
+                                  "Data memiliki ", simpul, ".\n",
+                                  "Berdasarkan perbandingan rata-rata dan median, serta standar deviasi.")
+      writeLines(interpretasi_text, file)
+    }
+  )
+  
+  output$download_eksplorasi_statistik <- downloadHandler(
+    filename = function() {
+      paste0("statistik_deskriptif_", input$variabel_eksplorasi, "_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      data <- data_sosial()[[input$variabel_eksplorasi]]
+      modus <- as.numeric(names(sort(table(data), decreasing = TRUE)[1]))
+      stats <- data.frame(
+        Statistik = c("Mean", "Median", "Modus", "Minimum", "Maksimum", "Range", "Standar_Deviasi"),
+        Nilai = round(c(mean(data, na.rm = TRUE), median(data, na.rm = TRUE), modus, 
+                       min(data, na.rm = TRUE), max(data, na.rm = TRUE), 
+                       diff(range(data, na.rm = TRUE)), sd(data, na.rm = TRUE)), 2)
+      )
+      write.csv(stats, file, row.names = FALSE)
+    }
+  )
+  
+  output$download_peta_statis <- downloadHandler(
+    filename = function() {
+      paste0("peta_statis_", input$variabel_eksplorasi, "_", Sys.Date(), ".png")
+    },
+    content = function(file) {
+      map_data <- geojson_data()
+      var_eksplorasi <- input$variabel_eksplorasi
+      map_data_filtered <- map_data %>% filter(!is.na(.data[[var_eksplorasi]]))
+      highlight_data <- if (input$pilihan_peringkat == "top") {
+        map_data_filtered %>% arrange(desc(.data[[var_eksplorasi]])) %>% head(10)
+      } else {
+        map_data_filtered %>% arrange(.data[[var_eksplorasi]]) %>% head(10)
+      }
+      plot_title <- paste("Peta 10 Kabupaten/Kota", gsub("_", " ", var_eksplorasi), 
+                          if(input$pilihan_peringkat == "top") "Tertinggi" else "Terendah")
+      
+      p <- ggplot() +
+        geom_sf(data = map_data, fill = "grey85", color = "white", size = 0.2) +
+        geom_sf(data = highlight_data, aes(fill = .data[[var_eksplorasi]]), color = "black", size = 0.4) +
+        scale_fill_distiller(palette = "YlOrRd", direction = 1, name = gsub("_", " ", var_eksplorasi)) +
+        theme_void() +
+        theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16), 
+              legend.position = "bottom", 
+              legend.key.width = unit(1.5, "cm"))
+      
+      ggsave(file, plot = p, width = 12, height = 10, dpi = 300)
+    }
+  )
+  
+  output$download_peta_interaktif <- downloadHandler(
+    filename = function() {
+      paste0("peta_interaktif_", input$variabel_eksplorasi, "_", Sys.Date(), ".html")
+    },
+    content = function(file) {
+      map_data <- geojson_data()
+      var_eksplorasi <- input$variabel_eksplorasi
+      map_data_filtered <- map_data %>% filter(!is.na(.data[[var_eksplorasi]]))
+      highlight_data <- if (input$pilihan_peringkat == "top") {
+        map_data_filtered %>% arrange(desc(.data[[var_eksplorasi]])) %>% head(10)
+      } else {
+        map_data_filtered %>% arrange(.data[[var_eksplorasi]]) %>% head(10)
+      }
+      pal <- colorNumeric(palette = "YlOrRd", domain = highlight_data[[var_eksplorasi]])
+      popup_content <- paste0("<strong>", highlight_data[[nama_kolom_kabupaten]], "</strong><br/>", 
+                             gsub("_", " ", var_eksplorasi), ": ", 
+                             format(highlight_data[[var_eksplorasi]], big.mark = "", decimal.mark = ",", scientific = FALSE))
+      
+      map <- leaflet() %>%
+        addTiles() %>%
+        setView(lng = 118, lat = -2, zoom = 5) %>%
+        addPolygons(data = map_data, fillColor = "grey", weight = 0.5, color = "white", fillOpacity = 0.5) %>%
+        addPolygons(data = highlight_data, fillColor = ~pal(highlight_data[[var_eksplorasi]]), 
+                   weight = 2, color = "black", fillOpacity = 0.9, popup = popup_content) %>%
+        addLegend(pal = pal, values = highlight_data[[var_eksplorasi]], opacity = 0.8, 
+                 title = gsub("_", " ", var_eksplorasi), position = "bottomright")
+      
+      saveWidget(map, file, selfcontained = TRUE)
+    }
+  )
+  
+  # --- DOWNLOAD HANDLERS UNTUK UJI ASUMSI --- #
+  output$download_norm_result <- downloadHandler(
+    filename = function() {
+      paste0("hasil_uji_normalitas_", input$norm_var, "_", Sys.Date(), ".txt")
+    },
+    content = function(file) {
+      test_result <- norm_test_output()
+      if (!is.null(test_result$error)) {
+        result_text <- test_result$error
+      } else {
+        result_text <- paste0("HASIL UJI NORMALITAS\n",
+                             "Tanggal: ", Sys.Date(), "\n",
+                             "====================\n\n",
+                             "Variabel: ", input$norm_var, "\n",
+                             "Metode: ", test_result$method, "\n",
+                             "Statistik: ", round(test_result$statistic, 4), "\n",
+                             "P-value: ", round(test_result$p.value, 4), "\n\n",
+                             "DATA LENGKAP:\n",
+                             capture.output(print(test_result)))
+      }
+      writeLines(result_text, file)
+    }
+  )
+  
+  output$download_norm_interpretasi <- downloadHandler(
+    filename = function() {
+      paste0("interpretasi_normalitas_", input$norm_var, "_", Sys.Date(), ".txt")
+    },
+    content = function(file) {
+      test_result <- norm_test_output()
+      if (!is.null(test_result$error)) {
+        interpretasi_text <- test_result$error
+      } else {
+        p_value <- test_result$p.value
+        interpretasi <- if (p_value > 0.05) {
+          paste0("Kesimpulan: P-value = ", round(p_value, 4), " dan nilainya lebih besar dibanding 0.05, maka data berdistribusi normal.")
+        } else {
+          paste0("Kesimpulan: P-value = ", round(p_value, 4), " dan nilainya lebih kecil atau sama dengan 0.05, maka data tidak berdistribusi normal.")
+        }
+        interpretasi_text <- paste0("INTERPRETASI UJI NORMALITAS\n",
+                                   "Tanggal: ", Sys.Date(), "\n",
+                                   "============================\n\n",
+                                   "Variabel: ", input$norm_var, "\n",
+                                   "Metode: ", test_result$method, "\n\n",
+                                   interpretasi)
+      }
+      writeLines(interpretasi_text, file)
+    }
+  )
+  
+  output$download_homog_result <- downloadHandler(
+    filename = function() {
+      paste0("hasil_uji_homogenitas_", input$homog_var, "_", Sys.Date(), ".txt")
+    },
+    content = function(file) {
+      test_result <- homog_test_output()
+      result_text <- paste0("HASIL UJI HOMOGENITAS VARIAN (LEVENE'S TEST)\n",
+                           "Tanggal: ", Sys.Date(), "\n",
+                           "==============================================\n\n",
+                           "Variabel: ", input$homog_var, "\n",
+                           "Grouping Variable: Kategori\n\n",
+                           "DATA LENGKAP:\n",
+                           capture.output(print(test_result)))
+      writeLines(result_text, file)
+    }
+  )
+  
+  output$download_homog_interpretasi <- downloadHandler(
+    filename = function() {
+      paste0("interpretasi_homogenitas_", input$homog_var, "_", Sys.Date(), ".txt")
+    },
+    content = function(file) {
+      test_result <- homog_test_output()
+      p_value <- test_result$`Pr(>F)`[1]
+      interpretasi <- if (is.na(p_value)) {
+        "Tidak dapat mengambil P-value."
+      } else if (p_value > 0.05) {
+        paste0("Kesimpulan: P-value = ", round(p_value, 4), " dan nilainya lebih besar dibanding 0.05, maka varian antarkelompok homogen.")
+      } else {
+        paste0("Kesimpulan: P-value = ", round(p_value, 4), " dan nilainya lebih kecil atau sama dengan 0.05, maka varian antarkelompok tidak homogen.")
+      }
+      interpretasi_text <- paste0("INTERPRETASI UJI HOMOGENITAS VARIAN\n",
+                                 "Tanggal: ", Sys.Date(), "\n",
+                                 "=====================================\n\n",
+                                 "Variabel: ", input$homog_var, "\n",
+                                 "Grouping Variable: Kategori\n\n",
+                                 interpretasi)
+      writeLines(interpretasi_text, file)
+    }
+  )
+  
+  # --- DOWNLOAD HANDLERS UNTUK UJI BEDA RATA-RATA --- #
+  output$download_ttest1_result <- downloadHandler(
+    filename = function() {
+      paste0("hasil_uji_t_satu_sampel_", input$ttest1_var, "_", Sys.Date(), ".txt")
+    },
+    content = function(file) {
+      test_result <- ttest1_output()
+      result_text <- paste0("HASIL UJI-T SATU SAMPEL\n",
+                           "Tanggal: ", Sys.Date(), "\n",
+                           "========================\n\n",
+                           "Variabel: ", input$ttest1_var, "\n",
+                           "Nilai Hipotesis μ: ", input$ttest1_mu, "\n\n",
+                           "DATA LENGKAP:\n",
+                           capture.output(print(test_result)))
+      writeLines(result_text, file)
+    }
+  )
+  
+  output$download_ttest1_interpretasi <- downloadHandler(
+    filename = function() {
+      paste0("interpretasi_uji_t_satu_sampel_", input$ttest1_var, "_", Sys.Date(), ".txt")
+    },
+    content = function(file) {
+      test_result <- ttest1_output()
+      p_value <- test_result$p.value
+      interpretasi <- if (p_value > 0.05) {
+        paste0("Kesimpulan: P-value = ", round(p_value, 4), " dan nilainya lebih besar dibanding 0.05. Maka dari itu, rata-rata sampel tidak berbeda signifikan dari Nilai Hipotesis Rata-Rata = ", input$ttest1_mu, " .")
+      } else {
+        paste0("Kesimpulan: P-value = ", round(p_value, 4), " dan nilainya lebih kecil atau sama dengan 0.05. Maka dari itu, rata-rata sampel berbeda signifikan dari Nilai Hipotesis Rata-Rata = ", input$ttest1_mu, ".")
+      }
+      interpretasi_text <- paste0("INTERPRETASI UJI-T SATU SAMPEL\n",
+                                 "Tanggal: ", Sys.Date(), "\n",
+                                 "===============================\n\n",
+                                 "Variabel: ", input$ttest1_var, "\n",
+                                 "Nilai Hipotesis μ: ", input$ttest1_mu, "\n\n",
+                                 interpretasi)
+      writeLines(interpretasi_text, file)
+    }
+  )
+  
+  output$download_ttest2_result <- downloadHandler(
+    filename = function() {
+      paste0("hasil_uji_t_dua_sampel_", input$ttest2_var, "_", Sys.Date(), ".txt")
+    },
+    content = function(file) {
+      test_result <- ttest2_output()
+      result_text <- paste0("HASIL UJI-T DUA SAMPEL INDEPENDEN\n",
+                           "Tanggal: ", Sys.Date(), "\n",
+                           "==================================\n\n",
+                           "Variabel: ", input$ttest2_var, "\n",
+                           "Grouping Variable: Kategori\n\n",
+                           "DATA LENGKAP:\n",
+                           capture.output(print(test_result)))
+      writeLines(result_text, file)
+    }
+  )
+  
+  output$download_ttest2_interpretasi <- downloadHandler(
+    filename = function() {
+      paste0("interpretasi_uji_t_dua_sampel_", input$ttest2_var, "_", Sys.Date(), ".txt")
+    },
+    content = function(file) {
+      test_result <- ttest2_output()
+      p_value <- test_result$p.value
+      interpretasi <- if (p_value > 0.05) {
+        "Kesimpulan: Tidak ada perbedaan rata-rata yang signifikan antara kedua kelompok."
+      } else {
+        "Kesimpulan: Terdapat perbedaan rata-rata yang signifikan antara kedua kelompok."
+      }
+      interpretasi_text <- paste0("INTERPRETASI UJI-T DUA SAMPEL INDEPENDEN\n",
+                                 "Tanggal: ", Sys.Date(), "\n",
+                                 "=========================================\n\n",
+                                 "Variabel: ", input$ttest2_var, "\n",
+                                 "Grouping Variable: Kategori\n\n",
+                                 interpretasi)
+      writeLines(interpretasi_text, file)
+    }
+  )
+  
+  # --- DOWNLOAD HANDLERS UNTUK UJI VARIANS --- #
+  output$download_var1_result <- downloadHandler(
+    filename = function() {
+      paste0("hasil_uji_varians_satu_sampel_", input$var1_var, "_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      test_result <- var1_test_output()
+      df_res <- data.frame(
+        Statistik = c("Statistik Chi-Square", "Derajat Bebas (df)", "P-value", "Varians Sampel", "Nilai Hipotesis Varians"),
+        Nilai = c(test_result$statistic, 
+                  test_result$parameters, 
+                  test_result$p.value,
+                  test_result$estimate,
+                  input$var1_sigma_sq)
+      )
+      write.csv(df_res, file, row.names = FALSE)
+    }
+  )
+  
+  output$download_var1_interpretasi <- downloadHandler(
+    filename = function() {
+      paste0("interpretasi_uji_varians_satu_sampel_", input$var1_var, "_", Sys.Date(), ".txt")
+    },
+    content = function(file) {
+      test_result <- var1_test_output()
+      p_value <- test_result$p.value
+      interpretasi <- if (p_value > 0.05) {
+        paste0("Kesimpulan: Varians sampel tidak berbeda signifikan dari Nilai Hipotesis Varians= ", input$var1_sigma_sq, ".")
+      } else {
+        paste0("Kesimpulan: Varians sampel berbeda signifikan dari Nilai Hipotesis Varians = ", input$var1_sigma_sq, ".")
+      }
+      interpretasi_text <- paste0("INTERPRETASI UJI VARIANS SATU SAMPEL\n",
+                                 "Tanggal: ", Sys.Date(), "\n",
+                                 "=====================================\n\n",
+                                 "Variabel: ", input$var1_var, "\n",
+                                 "Nilai Hipotesis σ²: ", input$var1_sigma_sq, "\n\n",
+                                 interpretasi)
+      writeLines(interpretasi_text, file)
+    }
+  )
+  
+  output$download_var2_result <- downloadHandler(
+    filename = function() {
+      paste0("hasil_uji_varians_dua_sampel_", input$var2_var, "_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      test_result <- var2_test_output()
+      df_res <- data.frame(
+        Statistik = c("Statistik F", "Derajat Bebas Numerator", "Derajat Bebas Denominator", "P-value", "Rasio Varians"),
+        Nilai = c(test_result$statistic, 
+                  test_result$parameter[1], 
+                  test_result$parameter[2], 
+                  test_result$p.value,
+                  test_result$estimate)
+      )
+      write.csv(df_res, file, row.names = FALSE)
+    }
+  )
+  
+  output$download_var2_interpretasi <- downloadHandler(
+    filename = function() {
+      paste0("interpretasi_uji_varians_dua_sampel_", input$var2_var, "_", Sys.Date(), ".txt")
+    },
+    content = function(file) {
+      test_result <- var2_test_output()
+      p_value <- test_result$p.value
+      interpretasi <- if (p_value > 0.05) {
+        "Kesimpulan: Tidak ada perbedaan varians yang signifikan antara kedua kelompok (varian homogen)."
+      } else {
+        "Kesimpulan: Terdapat perbedaan varians yang signifikan antara kedua kelompok (varian tidak homogen)."
+      }
+      interpretasi_text <- paste0("INTERPRETASI UJI VARIANS DUA SAMPEL\n",
+                                 "Tanggal: ", Sys.Date(), "\n",
+                                 "====================================\n\n",
+                                 "Variabel: ", input$var2_var, "\n",
+                                 "Grouping Variable: Kategori\n\n",
+                                 interpretasi)
+      writeLines(interpretasi_text, file)
+    }
+  )
+  
+  # --- DOWNLOAD HANDLERS UNTUK UJI PROPORSI --- #
+  output$download_prop1_result <- downloadHandler(
+    filename = function() {
+      paste0("hasil_uji_proporsi_satu_sampel_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      test_result <- prop1_test_output()
+      df_res <- data.frame(
+        Statistik = c("Statistik Chi-Square", "Derajat Bebas (df)", "P-value", "Proporsi Sampel", "Proporsi Hipotesis"),
+        Nilai = c(test_result$statistic, test_result$parameter, test_result$p.value, test_result$estimate, input$prop1_p_hipotesis)
+      )
+      write.csv(df_res, file, row.names = FALSE)
+    }
+  )
+  
+  output$download_prop1_interpretasi <- downloadHandler(
+    filename = function() {
+      paste0("interpretasi_uji_proporsi_satu_sampel_", Sys.Date(), ".txt")
+    },
+    content = function(file) {
+      test_result <- prop1_test_output()
+      p_value <- test_result$p.value
+      interpretasi <- if (p_value > 0.05) {
+        paste0("Kesimpulan: Proporsi sampel tidak berbeda signifikan dari Nilai Proporsi Hipotesis = ", input$prop1_p_hipotesis, ".")
+      } else {
+        paste0("Kesimpulan: Proporsi sampel berbeda signifikan dari Nilai Proporsi Hipotesis = ", input$prop1_p_hipotesis, ".")
+      }
+      interpretasi_text <- paste0("INTERPRETASI UJI PROPORSI SATU SAMPEL\n",
+                                 "Tanggal: ", Sys.Date(), "\n",
+                                 "======================================\n\n",
+                                 "Variabel Biner: prop_variable_biner\n",
+                                 "Kategori Sukses: ", input$prop_label_sukses, "\n",
+                                 "Proporsi Hipotesis: ", input$prop1_p_hipotesis, "\n\n",
+                                 interpretasi)
+      writeLines(interpretasi_text, file)
+    }
+  )
+  
+  output$download_prop2_result <- downloadHandler(
+    filename = function() {
+      paste0("hasil_uji_proporsi_dua_sampel_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      test_result <- prop2_test_output()
+      df_res <- data.frame(
+        Statistik = c("Statistik Chi-Square", "Derajat Bebas (df)", "P-value", "Proporsi Kelompok 1", "Proporsi Kelompok 2"),
+        Nilai = c(test_result$statistic, test_result$parameter, test_result$p.value, test_result$estimate[1], test_result$estimate[2])
+      )
+      write.csv(df_res, file, row.names = FALSE)
+    }
+  )
+  
+  output$download_prop2_interpretasi <- downloadHandler(
+    filename = function() {
+      paste0("interpretasi_uji_proporsi_dua_sampel_", Sys.Date(), ".txt")
+    },
+    content = function(file) {
+      test_result <- prop2_test_output()
+      p_value <- test_result$p.value
+      interpretasi <- if (p_value > 0.05) {
+        "Kesimpulan: Tidak ada perbedaan proporsi yang signifikan antara kedua kelompok."
+      } else {
+        "Kesimpulan: Terdapat perbedaan proporsi yang signifikan antara kedua kelompok."
+      }
+      interpretasi_text <- paste0("INTERPRETASI UJI PROPORSI DUA SAMPEL\n",
+                                 "Tanggal: ", Sys.Date(), "\n",
+                                 "=====================================\n\n",
+                                 "Variabel Biner: prop_variable_biner\n",
+                                 "Kategori Sukses: ", input$prop_label_sukses, "\n",
+                                 "Kelompok 1: ", input$prop2_group1, "\n",
+                                 "Kelompok 2: ", input$prop2_group2, "\n\n",
+                                 interpretasi)
+      writeLines(interpretasi_text, file)
+    }
+  )
+  
+  # --- DOWNLOAD HANDLERS UNTUK ANOVA --- #
+  output$download_anova_result <- downloadHandler(
+    filename = function() {
+      paste0("hasil_anova_", input$anova1_var, "_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      model_summary <- summary(anova1_model())
+      df_res <- as.data.frame(model_summary[[1]])
+      df_res <- tibble::rownames_to_column(df_res, "Sumber Variasi")
+      names(df_res)[names(df_res) == "Pr(>F)"] <- "P-value"
+      write.csv(df_res, file, row.names = FALSE)
+    }
+  )
+  
+  output$download_anova_posthoc <- downloadHandler(
+    filename = function() {
+      paste0("posthoc_tukey_", input$anova1_var, "_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      res_posthoc <- as.data.frame(anova1_posthoc_model()$Kategori)
+      res_posthoc <- tibble::rownames_to_column(res_posthoc, "Perbandingan Kelompok")
+      names(res_posthoc)[names(res_posthoc) == "p adj"] <- "P-value Adjusted"
+      write.csv(res_posthoc, file, row.names = FALSE)
+    }
+  )
+  
+  output$download_anova_interpretasi <- downloadHandler(
+    filename = function() {
+      paste0("interpretasi_anova_", input$anova1_var, "_", Sys.Date(), ".txt")
+    },
+    content = function(file) {
+      p_value <- summary(anova1_model())[[1]][["Pr(>F)"]][1]
+      interpretasi <- if (p_value < 0.05) {
+        "Hasil ANOVA signifikan karena P-value < 0.05 dan ini menunjukkan bahwa setidaknya ada satu kelompok yang rata-ratanya berbeda secara signifikan dari yang lain. Lihat tabel Post-Hoc untuk melihat pasangan kelompok mana yang berbeda."
+      } else {
+        "Hasil ANOVA tidak signifikan karena P-value lebih besar atau sama dengan 0.05 dan ini menunjukkan bahwa tidak ada perbedaan rata-rata yang signifikan antar kelompok."
+      }
+      interpretasi_text <- paste0("INTERPRETASI ANOVA SATU ARAH\n",
+                                 "Tanggal: ", Sys.Date(), "\n",
+                                 "=============================\n\n",
+                                 "Variabel Dependen: ", input$anova1_var, "\n",
+                                 "Grouping Variable: Kategori\n\n",
+                                 interpretasi)
+      writeLines(interpretasi_text, file)
+    }
+  )
+  
+  # --- DOWNLOAD HANDLERS UNTUK REGRESI LINEAR BERGANDA --- #
+  output$download_reg_summary <- downloadHandler(
+    filename = function() {
+      paste0("summary_regresi_", input$reg_var_dependen, "_", Sys.Date(), ".txt")
+    },
+    content = function(file) {
+      model <- reg_model_reactive()
+      result_text <- paste0("HASIL REGRESI LINEAR BERGANDA\n",
+                           "Tanggal: ", Sys.Date(), "\n",
+                           "==============================\n\n",
+                           "Variabel Dependen: ", input$reg_var_dependen, "\n",
+                           "Variabel Independen: ", paste(input$reg_var_independen, collapse = ", "), "\n\n",
+                           "SUMMARY MODEL:\n",
+                           capture.output(print(summary(model))))
+      writeLines(result_text, file)
+    }
+  )
+  
+  output$download_reg_data <- downloadHandler(
+    filename = function() {
+      paste0("data_regresi_", input$reg_var_dependen, "_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      data <- data_sosial()
+      var_y <- input$reg_var_dependen
+      vars_x <- input$reg_var_independen
+      data_to_export <- data %>% 
+        select(all_of(c(nama_kolom_kode, nama_kolom_kabupaten, var_y, vars_x)))
+      write.csv(data_to_export, file, row.names = FALSE)
+    }
+  )
+  
+  output$download_reg_asumsi <- downloadHandler(
+    filename = function() {
+      paste0("uji_asumsi_regresi_", input$reg_var_dependen, "_", Sys.Date(), ".txt")
+    },
+    content = function(file) {
+      # Kompilasi semua hasil uji asumsi
+      norm_result <- reg_norm_test_output()
+      auto_result <- autokorelasi_test()
+      multi_result <- multikolinearitas_test()
+      homo_result <- homoskedastisitas_test()
+      
+      result_text <- paste0("UJI ASUMSI KLASIK REGRESI LINEAR BERGANDA\n",
+                           "Tanggal: ", Sys.Date(), "\n",
+                           "==========================================\n\n",
+                           "Variabel Dependen: ", input$reg_var_dependen, "\n",
+                           "Variabel Independen: ", paste(input$reg_var_independen, collapse = ", "), "\n\n",
+                           "1. UJI NORMALITAS RESIDUAL:\n",
+                           if (!is.null(norm_result$error)) norm_result$error else capture.output(print(norm_result)), "\n\n",
+                           "2. UJI AUTOKORELASI (DURBIN-WATSON):\n",
+                           capture.output(print(auto_result)), "\n\n",
+                           "3. UJI MULTIKOLINEARITAS (VIF):\n",
+                           if (is.null(multi_result)) "Memerlukan minimal 2 variabel independen" else capture.output(print(multi_result)), "\n\n",
+                           "4. UJI HOMOSKEDASTISITAS (BREUSCH-PAGAN):\n",
+                           capture.output(print(homo_result)))
+      writeLines(result_text, file)
+    }
+  )
+  
+  # --- DOWNLOAD HANDLERS UNTUK CLUSTERING K-MEANS --- #
+  output$download_cluster_data <- downloadHandler(
+    filename = function() {
+      paste0("data_clustering_k", input$num_clusters, "_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      results <- clustering_results()
+      write.csv(results$data, file, row.names = FALSE)
+    }
+  )
+  
+  output$download_cluster_summary <- downloadHandler(
+    filename = function() {
+      paste0("ringkasan_clustering_k", input$num_clusters, "_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      results <- clustering_results()
+      summary_data <- results$data %>%
+        group_by(Cluster) %>%
+        summarise(
+          Jumlah_Observasi = n(),
+          .groups = "drop"
+        )
+      
+      # Tambahkan statistik deskriptif untuk setiap variabel
+      for (var in results$variables_used) {
+        var_stats <- results$data %>%
+          group_by(Cluster) %>%
+          summarise(
+            mean_val = round(mean(.data[[var]], na.rm = TRUE), 2),
+            .groups = "drop"
+          )
+        summary_data[[paste0("Rata_rata_", gsub("_", "_", var))]] <- var_stats$mean_val
+      }
+      write.csv(summary_data, file, row.names = FALSE)
+    }
+  )
+  
+  output$download_cluster_interpretasi <- downloadHandler(
+    filename = function() {
+      paste0("interpretasi_clustering_k", input$num_clusters, "_", Sys.Date(), ".txt")
+    },
+    content = function(file) {
+      results <- clustering_results()
+      sil_score <- results$silhouette_score
+      var_explained <- results$between_ss / results$total_ss * 100
+      
+      sil_interpretation <- if (sil_score > 0.7) {
+        "sangat baik"
+      } else if (sil_score > 0.5) {
+        "baik"
+      } else if (sil_score > 0.25) {
+        "cukup"
+      } else {
+        "kurang baik"
+      }
+      
+      interpretasi_text <- paste0("INTERPRETASI HASIL CLUSTERING K-MEANS\n",
+                                 "Tanggal: ", Sys.Date(), "\n",
+                                 "======================================\n\n",
+                                 "Jumlah Cluster: ", input$num_clusters, "\n",
+                                 "Variabel yang Digunakan: ", paste(results$variables_used, collapse = ", "), "\n",
+                                 "Jumlah Observasi: ", nrow(results$data), "\n\n",
+                                 "METRIK KUALITAS:\n",
+                                 "Silhouette Score: ", round(sil_score, 3), "\n",
+                                 "Varians yang Dijelaskan: ", round(var_explained, 1), "%\n\n",
+                                 "INTERPRETASI:\n",
+                                 "1. Kualitas Clustering: Silhouette score sebesar ", round(sil_score, 3), 
+                                 " menunjukkan bahwa kualitas clustering ", sil_interpretation, ".\n",
+                                 "2. Varians yang Dijelaskan: Model clustering menjelaskan ", 
+                                 round(var_explained, 1), "% dari total varians dalam data.\n",
+                                 "3. Rekomendasi: ",
+                                 if (sil_score > 0.5) {
+                                   "Hasil clustering dapat diandalkan untuk analisis lebih lanjut."
+                                 } else {
+                                   "Pertimbangkan untuk mengubah jumlah cluster atau variabel yang digunakan."
+                                 })
+      writeLines(interpretasi_text, file)
+    }
+  )
+  
+  output$download_cluster_plot <- downloadHandler(
+    filename = function() {
+      paste0("plot_clustering_k", input$num_clusters, "_", Sys.Date(), ".png")
+    },
+    content = function(file) {
+      results <- clustering_results()
+      
+      # Gunakan PCA untuk visualisasi jika lebih dari 2 variabel
+      if (length(results$variables_used) > 2) {
+        pca_result <- prcomp(results$scaled_data, scale. = FALSE)
+        plot_data <- data.frame(
+          PC1 = pca_result$x[, 1],
+          PC2 = pca_result$x[, 2],
+          Cluster = results$data$Cluster,
+          Kabupaten = results$data[[nama_kolom_kabupaten]]
+        )
+        
+        p <- ggplot(plot_data, aes(x = PC1, y = PC2, color = Cluster)) +
+          geom_point(size = 3, alpha = 0.7) +
+          geom_text(aes(label = substr(Kabupaten, 1, 10)), size = 2.5, vjust = -1) +
+          labs(title = "Hasil Clustering K-Means (PCA Plot)",
+               x = paste0("PC1 (", round(summary(pca_result)$importance[2, 1] * 100, 1), "%)"),
+               y = paste0("PC2 (", round(summary(pca_result)$importance[2, 2] * 100, 1), "%)")) +
+          theme_minimal() +
+          theme(legend.position = "bottom")
+      } else {
+        # Plot 2D jika hanya 2 variabel
+        plot_data <- data.frame(
+          X = results$scaled_data[, 1],
+          Y = results$scaled_data[, 2],
+          Cluster = results$data$Cluster,
+          Kabupaten = results$data[[nama_kolom_kabupaten]]
+        )
+        
+        p <- ggplot(plot_data, aes(x = X, y = Y, color = Cluster)) +
+          geom_point(size = 3, alpha = 0.7) +
+          geom_text(aes(label = substr(Kabupaten, 1, 10)), size = 2.5, vjust = -1) +
+          labs(title = "Hasil Clustering K-Means",
+               x = results$variables_used[1],
+               y = results$variables_used[2]) +
+          theme_minimal() +
+          theme(legend.position = "bottom")
+      }
+      
+      ggsave(file, plot = p, width = 12, height = 8, dpi = 300)
+    }
+  )
+  
+  output$download_elbow_plot <- downloadHandler(
+    filename = function() {
+      paste0("elbow_plot_clustering_", Sys.Date(), ".png")
+    },
+    content = function(file) {
+      results <- clustering_results()
+      
+      elbow_data <- data.frame(
+        k = 2:8,
+        wss = results$wss_values
+      )
+      
+      p <- ggplot(elbow_data, aes(x = k, y = wss)) +
+        geom_line(size = 1, color = "blue") +
+        geom_point(size = 3, color = "red") +
+        geom_vline(xintercept = input$num_clusters, linetype = "dashed", color = "green") +
+        labs(title = "Elbow Method untuk Menentukan Jumlah Cluster Optimal",
+             x = "Jumlah Cluster (k)",
+             y = "Within Sum of Squares") +
+        theme_minimal() +
+        scale_x_continuous(breaks = 2:8)
+      
+      ggsave(file, plot = p, width = 10, height = 6, dpi = 300)
+    }
+  )
   
 }
 
